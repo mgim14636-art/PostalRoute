@@ -192,7 +192,9 @@ erDiagram
 | total_distance_km | DOUBLE | NOT NULL | 전체 이동 거리 합 |
 | result_json | LONGTEXT | | 계산 결과(차량별 전체 경로) 저장, 상세보기·재계산·엑셀 다운로드에 재사용 |
 
-## 실행 방법
+## ⅲ. 실행 방법
+
+### 1. 실행 방법
 
 아래는 **Windows** 환경 기준 실행 방법이다.
 
