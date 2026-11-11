@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>로그인</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/theme.css">
+  <style>
+    .login-links {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 4px;
+    }
+
+    .login-links a {
+      color: var(--slate);
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .login-links a:hover {
+      color: var(--red);
+    }
+
+    .brand-logo {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .brand-name {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 32px;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-tagline {
+      font-family: var(--font-body);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--slate);
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body class="center-page">
+  <div class="auth-shell">
+    <h1 class="brand-logo">
+      <span class="brand-name"><span class="brand-postal">Postal</span><span class="brand-route">Route</span></span>
+      <span class="brand-tagline">우체국 차량 동선 최적화</span>
+    </h1>
+    <div class="panel">
+      <form class="form-stack">
+        <input type="text" id="username" name="username" placeholder="아이디">
+        <div class="password-field">
+          <input type="password" id="password" name="password" placeholder="비밀번호">
+          <button type="button" class="eye-button" onclick="togglePassword('password')">👁</button>
+        </div>
+        <button type="submit" class="btn-primary btn-block">로그인</button>
+        <div class="login-links">
+          <a href="find-id.html">ID 찾기</a>
+          <a href="find-pw.html">PW 찾기</a>
+          <a href="signup.html">회원가입</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal-overlay" id="loginModal">
+    <div class="modal-box">
+      <h3>알림</h3>
+      <p id="loginMessage"></p>
+      <button type="button" id="loginConfirmBtn" class="btn-primary">확인</button>
+    </div>
+  </div>
+
+  <script>
+    let loginSucceeded = false;
+
+    document.querySelector('form').addEventListener('submit', function(event) {
+      event.preventDefault();
+
+      const username = document.getElementById('username').value;
+      const password = document.getElementById('password').value;
+
+      fetch('/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password })
+          })
+            .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+            .then(result => {
+              console.log('로그인 응답:', result.data);
+              loginSucceeded = result.ok;
+              if (result.ok) {
+                sessionStorage.setItem('loginUsername', username);
+              }
+              document.getElementById('loginMessage').textContent = result.ok
+                ? '로그인 완료!'
+                : '아이디 또는 비밀번호가 일치하지 않습니다.';
+              document.getElementById('loginModal').classList.add('show');
+            });
+        });
+
+        // 확인 버튼을 누르면, 로그인이 성공했을 때만 메인 화면으로 이동
+        document.getElementById('loginConfirmBtn').addEventListener('click', function() {
+            document.getElementById('loginModal').classList.remove('show');
+            if (loginSucceeded) {
+              window.location.href = 'main.html';
+            }
+        });
+
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+  </script>
+</body>
+</html>

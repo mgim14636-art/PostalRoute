@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>동선 최적화</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        body {
+            padding: 32px 16px 80px;
+        }
+
+        .panel, .page-header {
+            max-width: 560px;
+            margin-bottom: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .panel-header h2 {
+            margin: 0;
+        }
+
+        .dest-company-register-btn, .dest-reset-btn, .dest-delete-btn {
+            padding: 7px 10px;
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--slate);
+            border-radius: 3px;
+            font-family: var(--font-body);
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .dest-delete-btn {
+            border-color: var(--red);
+            color: var(--red);
+        }
+
+        .destination-item {
+            margin-bottom: 10px;
+        }
+
+        .dest-row-label {
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--ink);
+        }
+
+        .destination-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 14px;
+            background-color: var(--input-bg);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+        }
+
+        /* 주소를 못 찾은 집하 동선 줄을 빨간 테두리로 표시해줌 */
+        .destination-row.dest-row-error {
+            border: 2px solid var(--red);
+        }
+
+        .destination-row input {
+            background-color: var(--surface);
+        }
+
+        .dest-company-field {
+            flex: 1 1 100%;
+            position: relative;
+        }
+
+        .dest-company-results {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            max-height: 160px;
+            overflow-y: auto;
+            z-index: 10;
+        }
+
+        .dest-company-results.show {
+            display: block;
+        }
+
+        .dest-company-result-item {
+            padding: 8px 10px;
+            font-size: 13px;
+            cursor: pointer;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .dest-company-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .dest-company-result-item:hover {
+            background: var(--input-bg);
+        }
+
+        .dest-address, .dest-address-detail {
+            flex: 1 1 100%;
+        }
+
+        .dest-flat, .dest-roll {
+            flex: 1 1 calc(50% - 8px);
+            font-family: var(--font-mono);
+        }
+
+        .dest-time-field {
+            flex: 1 1 100%;
+            position: relative;
+        }
+
+        .dest-time-field .dest-time {
+            width: 100%;
+            padding-right: 34px;
+            font-family: var(--font-mono);
+        }
+
+        .dest-time-picker-btn {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            border: none;
+            background: none;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .dest-time-native {
+            position: absolute;
+            width: 0;
+            height: 0;
+            opacity: 0;
+            border: 0;
+            padding: 0;
+            pointer-events: none;
+        }
+
+        .dest-row-actions {
+            flex: 1 1 100%;
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .dest-toolbar {
+            margin-bottom: 20px;
+        }
+
+        #optimizeBtn {
+            margin-top: 8px;
+            font-size: 16px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button type="button" class="back-button" onclick="history.back()" aria-label="뒤로가기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <h1>우체국 동선 최적화</h1>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <h2>집하 동선 목록</h2>
+            <button type="button" id="resetAllBtn" class="btn-ghost">전체 초기화</button>
+        </div>
+        <div class="icon-toolbar dest-toolbar">
+            <button type="button" id="addDestinationBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">＋</span>
+                한 곳 추가
+            </button>
+            <button type="button" id="bulkAddBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">≡</span>
+                여러 곳 한번에
+            </button>
+            <button type="button" id="pasteImportBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">⇪</span>
+                엑셀로 가져오기
+            </button>
+        </div>
+        <div id="destinationList"></div>
+        <button type="button" id="optimizeBtn" class="btn-primary btn-block">최적화 시작</button>
+    </div>
+
+    <div class="modal-overlay" id="bulkAddModal">
+        <div class="modal-box">
+            <h3>일괄 집하 동선 추가</h3>
+            <p>몇 개를 추가하시겠습니까?</p>
+            <input type="number" id="bulkAddInput" placeholder="숫자 입력" min="1">
+            <div class="modal-actions">
+                <button type="button" id="bulkAddCancelBtn" class="btn-ghost">취소</button>
+                <button type="button" id="bulkAddConfirmBtn" class="btn-primary">확인</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="pasteImportModal">
+        <div class="modal-box modal-box-wide">
+            <h3>엑셀로 가져오기</h3>
+            <p>
+                열 순서: <b>업체명 / 주소 / 상세주소 / 평파렛 / 롤파렛 / 요청시간</b> (업체명, 요청시간은 비워도 돼요)<br>
+                주소를 안 적어도 <b>등록된 업체명</b>이면 자동으로 주소를 찾아와요. 표의 첫 줄부터 바로 데이터를 적어주세요 (제목 줄 없이).
+            </p>
+            <div class="excel-file-row">
+                <label for="excelFileInput" class="btn-outline">엑셀 파일 선택</label>
+                <input type="file" id="excelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                <span class="excel-file-name" id="excelFileName">선택된 파일 없음</span>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="pasteImportCancelBtn" class="btn-ghost">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="errorModal">
+        <div class="modal-box">
+            <h3>확인해주세요</h3>
+            <p id="errorMessage"></p>
+            <button type="button" id="errorConfirmBtn" class="btn-primary">확인</button>
+        </div>
+    </div>
+
+    <!-- 주소 변환 + 최적화 계산하는 동안 보여주는 로딩 팝업 (닫기 버튼 없음 - 끝날 때까지 기다려야 함) -->
+    <div class="modal-overlay" id="loadingModal">
+        <div class="modal-box loading-box">
+            <div class="loading-spinner"></div>
+            <p>동선 최적화 진행중입니다...</p>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="companyRegisterModal">
+        <div class="modal-box">
+            <h3>업체 등록</h3>
+            <p id="companyRegisterMessage"></p>
+            <div class="modal-actions">
+                <button type="button" id="companyRegisterCancelBtn" class="btn-ghost">아니요</button>
+                <button type="button" id="companyRegisterConfirmBtn" class="btn-primary">네</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       // 주소 검색창이 이미 떠 있는 동안에는 다른 줄에서 또 눌러도 새 창을 안 띄움
+       let addressSearchOpen = false;
+
+       function openAddressSearch(inputElement) {
+       if (addressSearchOpen) {
+           return;
+       }
+       addressSearchOpen = true;
+       new daum.Postcode({
+       oncomplete: function(data) {
+       inputElement.value = data.address;
+       const row = inputElement.closest('.destination-row');
+       if (row) {
+           row.classList.remove('dest-row-error');
+           // 주소를 직접 다시 검색해서 바꿨으면, 더 이상 "등록된 업체의 그 주소"가 아닐 수 있으니 표시를 지움
+           delete row.dataset.confirmedCompanyName;
+       }
+            },
+       onclose: function() {
+           addressSearchOpen = false;
+       }
+          }).open();
+       }
+
+        // initialData가 있으면(이력에서 "재사용"으로 넘어온 경우) 새 줄을 만들면서 바로 값을 채워넣음
+        function addDestinationRow(initialData) {
+            const item = document.createElement('div');
+            item.className = 'destination-item';
+
+            const label = document.createElement('p');
+            label.className = 'dest-row-label';
+            item.appendChild(label);
+
+            const row = document.createElement('div');
+            row.className = 'destination-row';
+            row.innerHTML = `
+                <div class="dest-company-field">
+                    <input type="text" class="dest-company-search" placeholder="업체명으로 찾기 (예: 흙향)">
+                    <div class="dest-company-results"></div>
+                </div>
+                <input type="text" class="dest-address" placeholder="주소 (클릭해서 검색)" readonly onclick="openAddressSearch(this)">
+                <input type="text" class="dest-address-detail" placeholder="상세주소 (동/호수 등)">
+                <input type="number" class="dest-flat" placeholder="평파렛 개수" min="0">
+                <input type="number" class="dest-roll" placeholder="롤파렛 개수" min="0">
+                <div class="dest-time-field">
+                    <input type="text" class="dest-time" placeholder="요청시간" inputmode="numeric" maxlength="5">
+                    <button type="button" class="dest-time-picker-btn">🕒</button>
+                    <input type="time" class="dest-time-native" tabindex="-1">
+                </div>
+                <p class="field-error dest-time-error">시간은 00:00~23:59 사이로 입력해주세요.</p>
+                <div class="dest-row-actions">
+                    <button type="button" class="dest-company-register-btn">+ 업체로 등록</button>
+                    <button type="button" class="dest-reset-btn">초기화</button>
+                    <button type="button" class="dest-delete-btn">삭제</button>
+                </div>
+            `;
+
+            row.querySelector('.dest-flat').addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+                row.classList.remove('dest-row-error');
+            });
+            row.querySelector('.dest-roll').addEventListener('input', function() {
+                this.value = this.value.replace(/[^0-9]/g, '');
+                row.classList.remove('dest-row-error');
+            });
+
+            const timeText = row.querySelector('.dest-time');
+            const timeNative = row.querySelector('.dest-time-native');
+            const timeBtn = row.querySelector('.dest-time-picker-btn');
+            const timeError = row.querySelector('.dest-time-error');
+
+            // 숫자만 입력받아서 "2359" 처럼 치면 "23:59"로 자동으로 콜론을 끼워주는 부분
+            // + 다 입력됐을 때 시간이 00:00~23:59 범위를 벗어나면("9:99" 같은 경우) 안내 문구를 보여줌
+            timeText.addEventListener('input', function() {
+                row.classList.remove('dest-row-error');
+                const digits = this.value.replace(/[^0-9]/g, '').slice(0, 4);
+                if (digits.length >= 3) {
+                    this.value = digits.slice(0, 2) + ':' + digits.slice(2);
+                } else {
+                    this.value = digits;
+                }
+
+                if (digits.length === 4) {
+                    const hour = parseInt(digits.slice(0, 2), 10);
+                    const minute = parseInt(digits.slice(2, 4), 10);
+                    if (hour > 23 || minute > 59) {
+                        timeError.classList.add('show');
+                    } else {
+                        timeError.classList.remove('show');
+                    }
+                } else {
+                    timeError.classList.remove('show');
+                }
+            });
+
+            // 시계 버튼을 누르면 마우스로 고를 수 있는 시간 선택창이 뜨는 부분
+            timeBtn.addEventListener('click', function() {
+                if (timeNative.showPicker) {
+                    timeNative.showPicker();
+                } else {
+                    timeNative.focus();
+                }
+            });
+
+            // 마우스로 고른 시간을 화면에 보이는 입력칸에 그대로 채워주는 부분
+            timeNative.addEventListener('input', function() {
+                timeText.value = timeNative.value;
+            });
+
+            // 업체명으로 찾기: 글자를 치면 잠깐 기다렸다가(디바운스) 등록된 업체 중에 맞는 걸 검색함
+            const companySearch = row.querySelector('.dest-company-search');
+            const companyResults = row.querySelector('.dest-company-results');
+            const addressInput = row.querySelector('.dest-address');
+            let companySearchTimer = null;
+
+            companySearch.addEventListener('input', function() {
+                // 업체명을 다시 고치기 시작하면, 전에 확정됐던 "등록된 업체" 표시는 무효로 함
+                delete row.dataset.confirmedCompanyName;
+                const keyword = this.value.trim();
+                clearTimeout(companySearchTimer);
+
+                if (keyword === '') {
+                    companyResults.classList.remove('show');
+                    companyResults.innerHTML = '';
+                    return;
+                }
+
+                companySearchTimer = setTimeout(async function() {
+                    let companies = [];
+                    try {
+                        const response = await fetch('/api/companies/search?keyword=' + encodeURIComponent(keyword));
+                        if (response.status === 401) {
+                            // 로그인이 안 돼있으면(세션 없음) 로그인 화면으로 보냄
+                            window.location.href = 'login.html';
+                            return;
+                        }
+                        companies = response.ok ? await response.json() : [];
+                    } catch (e) {
+                        companies = [];
+                    }
+
+                    companyResults.innerHTML = '';
+                    if (companies.length === 0) {
+                        companyResults.innerHTML = '<div class="dest-company-result-item">등록된 업체가 없어요</div>';
+                    } else {
+                        companies.forEach(function(company) {
+                            const item = document.createElement('div');
+                            item.className = 'dest-company-result-item';
+                            item.textContent = company.name + ' (' + company.address + ')';
+                            item.addEventListener('click', function() {
+                                addressInput.value = company.address;
+                                row.querySelector('.dest-address-detail').value = company.detailAddress || '';
+                                companySearch.value = company.name;
+                                row.dataset.confirmedCompanyName = company.name; // 결과 화면에 "(업체명)-주소"로 보여줄 표시
+                                companyResults.classList.remove('show');
+                            });
+                            companyResults.appendChild(item);
+                        });
+                    }
+                    companyResults.classList.add('show');
+                }, 250);
+            });
+
+            // "+ 업체로 등록" 버튼: 지금 입력된 업체명 + 주소를 주소록에 등록할지 물어봄
+            row.querySelector('.dest-company-register-btn').addEventListener('click', function() {
+                const name = companySearch.value.trim();
+                const address = addressInput.value.trim();
+                const detailAddress = row.querySelector('.dest-address-detail').value.trim();
+                if (name === '' || address === '') {
+                    showError('업체명과 주소를 모두 입력해주세요.');
+                    return;
+                }
+                openCompanyRegisterConfirm(name, address, detailAddress);
+            });
+
+            // 이 줄의 값만 처음 상태로 되돌리는 버튼
+            row.querySelector('.dest-reset-btn').addEventListener('click', function() {
+                companySearch.value = '';
+                delete row.dataset.confirmedCompanyName;
+                companyResults.classList.remove('show');
+                companyResults.innerHTML = '';
+                row.querySelector('.dest-address').value = '';
+                row.querySelector('.dest-address-detail').value = '';
+                row.querySelector('.dest-flat').value = '';
+                row.querySelector('.dest-roll').value = '';
+                timeText.value = '';
+                timeNative.value = '';
+                timeError.classList.remove('show');
+            });
+
+            // 이 줄 자체를 목록에서 지우는 버튼
+            row.querySelector('.dest-delete-btn').addEventListener('click', function() {
+                item.remove();
+                renumberDestinationRows();
+            });
+
+            if (initialData) {
+                if (initialData.companyName) {
+                    companySearch.value = initialData.companyName;
+                    // 등록된 업체명으로 주소를 자동으로 찾아온 경우에만 "(업체명)" 표시를 확정함
+                    if (initialData.isRegisteredCompany) {
+                        row.dataset.confirmedCompanyName = initialData.companyName;
+                    }
+                }
+                row.querySelector('.dest-address').value = initialData.name || '';
+                row.querySelector('.dest-address-detail').value = initialData.detail || '';
+                row.querySelector('.dest-flat').value = initialData.flatPalletCount || '';
+                row.querySelector('.dest-roll').value = initialData.rollPalletCount || '';
+                timeText.value = initialData.requestedTime || '';
+            }
+
+            item.appendChild(row);
+            document.getElementById('destinationList').appendChild(item);
+            renumberDestinationRows();
+        }
+
+        // 집하 동선마다 위쪽에 "집하 동선 1", "집하 동선 2"... 라벨을 다시 매겨주는 함수
+        // (중간 걸 삭제하면 뒤 번호들이 한 칸씩 당겨져야 하니, 추가/삭제할 때마다 전체를 다시 매김)
+        function renumberDestinationRows() {
+            const items = document.querySelectorAll('.destination-item');
+            items.forEach(function(item, index) {
+                item.querySelector('.dest-row-label').textContent = '집하 동선 ' + (index + 1);
+            });
+        }
+
+        // addDestinationRow를 그냥 넘기면 클릭 이벤트 객체가 initialData로 들어가버려서(예: event.detail이 상세주소 칸에 들어감),
+        // 인자 없이 호출하도록 감싸서 등록함
+        document.getElementById('addDestinationBtn').addEventListener('click', function() {
+            addDestinationRow();
+        });
+
+        // 일괄 추가 팝업을 여닫는 부분
+        const bulkAddModal = document.getElementById('bulkAddModal');
+        const bulkAddInput = document.getElementById('bulkAddInput');
+
+        function openBulkAddModal() {
+            bulkAddModal.classList.add('show');
+            bulkAddInput.value = '';
+            bulkAddInput.focus();
+        }
+
+        function closeBulkAddModal() {
+            bulkAddModal.classList.remove('show');
+        }
+
+        document.getElementById('bulkAddBtn').addEventListener('click', openBulkAddModal);
+        document.getElementById('bulkAddCancelBtn').addEventListener('click', closeBulkAddModal);
+
+        // 팝업 바깥 회색 배경을 누르면 닫히도록
+        bulkAddModal.addEventListener('click', function(event) {
+            if (event.target === bulkAddModal) closeBulkAddModal();
+        });
+
+        // 입력한 숫자만큼 집하 동선 줄을 한 번에 추가하는 버튼
+        document.getElementById('bulkAddConfirmBtn').addEventListener('click', function() {
+            const count = parseInt(bulkAddInput.value);
+            if (count && count > 0) {
+                for (let i = 0; i < count; i++) {
+                    addDestinationRow();
+                }
+            }
+            closeBulkAddModal();
+        });
+
+        // 입력칸에서 엔터키를 눌러도 확인 버튼과 똑같이 동작하도록
+        bulkAddInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+                document.getElementById('bulkAddConfirmBtn').click();
+            }
+        });
+
+        // 엑셀 가져오기 팝업을 여닫는 부분
+        const pasteImportModal = document.getElementById('pasteImportModal');
+        const excelFileInput = document.getElementById('excelFileInput');
+        const excelFileName = document.getElementById('excelFileName');
+
+        function openPasteImportModal() {
+            pasteImportModal.classList.add('show');
+            excelFileInput.value = '';
+            excelFileName.textContent = '선택된 파일 없음';
+        }
+
+        function closePasteImportModal() {
+            pasteImportModal.classList.remove('show');
+        }
+
+        document.getElementById('pasteImportBtn').addEventListener('click', openPasteImportModal);
+        document.getElementById('pasteImportCancelBtn').addEventListener('click', closePasteImportModal);
+
+        pasteImportModal.addEventListener('click', function(event) {
+            if (event.target === pasteImportModal) closePasteImportModal();
+        });
+
+        // "1430" 처럼 숫자만 붙여넣었거나 "14:30:00" 처럼 초까지 딸려왔을 때도 "14:30" 형태로 맞춰줌.
+        // 알아볼 수 없는 형태면 그냥 빈 값으로 처리함 (나중에 화면에서 직접 입력하면 됨)
+        function normalizePastedTime(raw) {
+            const value = (raw || '').trim();
+            if (value === '') return '';
+
+            const colonMatch = value.match(/^([0-9]{1,2}):([0-9]{2})/);
+            if (colonMatch) {
+                const hour = colonMatch[1].padStart(2, '0');
+                return isTimeValid(hour + ':' + colonMatch[2]) ? hour + ':' + colonMatch[2] : '';
+            }
+
+            const digits = value.replace(/[^0-9]/g, '');
+            if (digits.length === 4) {
+                const formatted = digits.slice(0, 2) + ':' + digits.slice(2);
+                return isTimeValid(formatted) ? formatted : '';
+            }
+            return '';
+        }
+
+        // 주소/수량만 채워져있고 비어있는 기본 줄은 가져오기 전에 미리 치워둠 (빈 줄이 중간에 끼지 않도록)
+        function removeEmptyDestinationRows() {
+            document.querySelectorAll('.destination-item').forEach(function(item) {
+                const row = item.querySelector('.destination-row');
+                const isEmpty = row.querySelector('.dest-address').value.trim() === ''
+                    && row.querySelector('.dest-flat').value.trim() === ''
+                    && row.querySelector('.dest-roll').value.trim() === ''
+                    && row.querySelector('.dest-time').value.trim() === '';
+                if (isEmpty) item.remove();
+            });
+        }
+
+        // 등록된 업체 중에 이름이 정확히 같은 업체를 찾아 주소를 돌려줌 (없으면 null)
+        async function findCompanyByExactName(name) {
+            try {
+                const response = await fetch('/api/companies/search?keyword=' + encodeURIComponent(name));
+                if (!response.ok) return null;
+                const companies = await response.json();
+                return companies.find(function(c) { return c.name === name; }) || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // rows: [[업체명, 주소, 상세주소, 평파렛, 롤파렛, 요청시간], ...] 형태의 2차원 배열
+        // (엑셀 파일을 읽은 것이든, 붙여넣은 텍스트를 쪼갠 것이든 여기서 똑같이 처리함)
+        async function importDestinationRows(rows) {
+            const candidates = [];
+            for (const cells of rows) {
+                if (!cells) continue;
+                const companyName = (cells[0] || '').toString().trim();
+                const address = (cells[1] || '').toString().trim();
+                if (companyName === '' && address === '') continue; // 완전히 빈 줄은 건너뜀
+                candidates.push({
+                    companyName: companyName,
+                    address: address,
+                    detail: (cells[2] || '').toString().trim(),
+                    flatPalletCount: (cells[3] || '').toString().trim(),
+                    rollPalletCount: (cells[4] || '').toString().trim(),
+                    requestedTime: normalizePastedTime((cells[5] || '').toString())
+                });
+            }
+
+            if (candidates.length === 0) {
+                showError('가져올 수 있는 줄이 없어요. 업체명이나 주소 중 하나는 있어야 해요.');
+                return;
+            }
+
+            // 주소가 비어있고 업체명만 있는 줄은, 등록된 업체 목록에서 이름이 같은 곳을 찾아 주소를 채워넣음
+            const notFoundCompanies = [];
+            for (const candidate of candidates) {
+                if (candidate.address === '' && candidate.companyName !== '') {
+                    const company = await findCompanyByExactName(candidate.companyName);
+                    if (company) {
+                        candidate.address = company.address;
+                        if (candidate.detail === '') {
+                            candidate.detail = company.detailAddress || '';
+                        }
+                        candidate.isRegisteredCompany = true; // 결과 화면에 "(업체명)" 표시할지 여부
+                    } else {
+                        notFoundCompanies.push(candidate.companyName);
+                    }
+                }
+            }
+
+            removeEmptyDestinationRows();
+            candidates.forEach(function(candidate) {
+                addDestinationRow({
+                    companyName: candidate.companyName,
+                    isRegisteredCompany: candidate.isRegisteredCompany,
+                    name: candidate.address,
+                    detail: candidate.detail,
+                    flatPalletCount: candidate.flatPalletCount,
+                    rollPalletCount: candidate.rollPalletCount,
+                    requestedTime: candidate.requestedTime
+                });
+            });
+            closePasteImportModal();
+
+            if (notFoundCompanies.length > 0) {
+                showError('다음 업체는 등록된 주소가 없어서 직접 입력해야 해요: ' + notFoundCompanies.join(', '));
+            }
+        }
+
+        // 엑셀 파일(.xlsx/.xls/.csv)을 선택하면 바로 읽어서 추가함
+        excelFileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            excelFileName.textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                let rows;
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                } catch (err) {
+                    showError('엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요.');
+                    return;
+                }
+                await importDestinationRows(rows);
+            };
+            reader.onerror = function() {
+                showError('엑셀 파일을 읽지 못했어요.');
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 집하 동선 목록 전체를 지우고 한 줄만 남겨서 처음 상태로 되돌리는 버튼
+        document.getElementById('resetAllBtn').addEventListener('click', function() {
+            document.getElementById('destinationList').innerHTML = '';
+            addDestinationRow();
+        });
+
+        addDestinationRow();
+
+        // 이력 화면에서 "재사용" 버튼을 눌러서 들어온 경우, 그때 저장해둔 집하 동선들을 불러와 채워넣음
+        (function restoreReuseDestinations() {
+            const raw = sessionStorage.getItem('reuseDestinations');
+            if (!raw) return;
+            sessionStorage.removeItem('reuseDestinations');
+
+            let destinations = [];
+            try {
+                destinations = JSON.parse(raw);
+            } catch (e) {
+                return;
+            }
+            if (!Array.isArray(destinations) || destinations.length === 0) return;
+
+            document.getElementById('destinationList').innerHTML = '';
+            destinations.forEach(function(dest) {
+                addDestinationRow(dest);
+            });
+        })();
+
+            // 에러 팝업을 띄우는 함수 (어디서든 호출해서 간단하게 안내 문구를 보여줄 수 있음)
+            function showError(message) {
+                document.getElementById('errorMessage').textContent = message;
+                document.getElementById('errorModal').classList.add('show');
+            }
+
+            // 주소 변환 + 최적화 계산하는 동안 로딩 팝업 띄우고/끄는 함수
+            const loadingModal = document.getElementById('loadingModal');
+            const optimizeBtn = document.getElementById('optimizeBtn');
+            function showLoading() {
+                loadingModal.classList.add('show');
+                optimizeBtn.disabled = true;
+            }
+            function hideLoading() {
+                loadingModal.classList.remove('show');
+                optimizeBtn.disabled = false;
+            }
+            document.getElementById('errorConfirmBtn').addEventListener('click', function() {
+                document.getElementById('errorModal').classList.remove('show');
+            });
+
+            // 업체 등록 확인 팝업: "이 이름 + 이 주소로 등록할지" 물어보고,
+            // 확인을 누르면 그때 서버에 저장 요청을 보냄
+            let pendingCompany = null;
+
+            function openCompanyRegisterConfirm(name, address, detailAddress) {
+                pendingCompany = { name: name, address: address, detailAddress: detailAddress || null };
+                const fullAddress = detailAddress ? address + ' ' + detailAddress : address;
+                document.getElementById('companyRegisterMessage').textContent =
+                    '"' + name + '"을(를) "' + fullAddress + '" 주소로 업체 등록하시겠습니까?';
+                document.getElementById('companyRegisterModal').classList.add('show');
+            }
+
+            document.getElementById('companyRegisterCancelBtn').addEventListener('click', function() {
+                document.getElementById('companyRegisterModal').classList.remove('show');
+                pendingCompany = null;
+            });
+
+            document.getElementById('companyRegisterConfirmBtn').addEventListener('click', async function() {
+                if (!pendingCompany) return;
+                const company = pendingCompany;
+                pendingCompany = null;
+                document.getElementById('companyRegisterModal').classList.remove('show');
+
+                try {
+                    const response = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(company)
+                    });
+                    if (!response.ok) {
+                        // 이름/주소가 이미 등록되어 있을 때(409) 서버가 보내주는 메시지를 그대로 보여줌
+                        const errorBody = await response.json();
+                        showError(errorBody.message || '업체 등록에 실패했어요. 잠시 후 다시 시도해주세요.');
+                        return;
+                    }
+                    showError('"' + company.name + '" 업체로 등록됐어요.');
+                } catch (e) {
+                    showError('업체 등록에 실패했어요. 잠시 후 다시 시도해주세요.');
+                }
+            });
+
+            // "09:00" 같은 시간 문자열이 00:00~23:59 범위 안에 있는지 확인
+            // (비어있으면 "시간 없음"이라는 뜻이라 유효한 걸로 취급)
+            function isTimeValid(value) {
+                if (!value) return true;
+                const match = value.match(/^([0-9]{2}):([0-9]{2})$/);
+                if (!match) return false;
+                const hour = parseInt(match[1], 10);
+                const minute = parseInt(match[2], 10);
+                return hour <= 23 && minute <= 59;
+            }
+
+            // 주소 하나를 좌표로 바꿔달라고 서버에 물어보는 함수
+            // 서버가 주소를 못 찾으면(response.ok가 false) 에러를 던져서 호출한 쪽에서 알아챌 수 있게 함
+            async function geocodeAddress(address) {
+              const response = await fetch('/api/geocode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address: address })
+              });
+              if (!response.ok) {
+                throw new Error('ADDRESS_NOT_FOUND:' + address);
+              }
+              return await response.json();
+            }
+
+            document.getElementById('optimizeBtn').addEventListener('click', async function() {
+              // 0. 주소가 입력된 줄만 모음 (칸만 만들어놓고 비워둔 줄은 그냥 건너뜀)
+              // 단, 업체명만 적어두고 주소가 안 채워진 줄은 "빈 줄"이 아니라 "덜 채운 줄"이라
+              // 조용히 건너뛰지 않고 따로 걸러내서 알려줌 (안 그러면 그 집하 동선이 통째로 빠진 채 계산돼버림)
+              const destinationRows = document.querySelectorAll('.destination-row');
+              destinationRows.forEach(function(row) { row.classList.remove('dest-row-error'); });
+              const filledRows = [];
+              const incompleteRows = [];
+              for (const row of destinationRows) {
+                const address = row.querySelector('.dest-address').value.trim();
+                const companyName = row.querySelector('.dest-company-search').value.trim();
+                if (address !== '') {
+                  filledRows.push(row);
+                } else if (companyName !== '') {
+                  incompleteRows.push(row);
+                }
+              }
+
+              if (incompleteRows.length > 0) {
+                incompleteRows.forEach(function(row) { row.classList.add('dest-row-error'); });
+                incompleteRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showError('업체명은 입력했는데 주소가 비어있는 집하 동선이 있어요. 빨간 테두리로 표시된 곳의 주소를 검색해서 선택해주세요.');
+                return;
+              }
+
+              if (filledRows.length === 0) {
+                showError('집하 동선을 1개 이상 입력해주세요.');
+                return;
+              }
+
+              // 0-1. 시간이 적혀있는 줄 중에 00:00~23:59 범위를 벗어난 게 있는지 확인
+              const invalidTimeRows = filledRows.filter(function(row) {
+                return !isTimeValid(row.querySelector('.dest-time').value);
+              });
+              if (invalidTimeRows.length > 0) {
+                invalidTimeRows.forEach(function(row) { row.classList.add('dest-row-error'); });
+                invalidTimeRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showError('요청 시간이 올바르지 않은 집하 동선이 있어요. 빨간 테두리로 표시된 곳을 00:00~23:59 사이로 입력해주세요.');
+                return;
+              }
+
+              // 0-2. 주소는 입력했는데 평파렛/롤파렛을 둘 다 안 적은 줄이 있는지 확인
+              // (둘 다 비워둔 건 보통 깜빡하고 안 쓴 경우라서, 0으로 그냥 넘기지 않고 알려줌)
+              const missingPalletRows = filledRows.filter(function(row) {
+                return row.querySelector('.dest-flat').value === '' && row.querySelector('.dest-roll').value === '';
+              });
+              if (missingPalletRows.length > 0) {
+                missingPalletRows.forEach(function(row) { row.classList.add('dest-row-error'); });
+                missingPalletRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showError('파렛 개수가 작성되지 않은 곳이 있어요. 빨간 테두리로 표시된 곳을 확인해주세요.');
+                return;
+              }
+
+              // 1. 집하 동선들 하나씩 좌표 변환 (하나가 실패해도 멈추지 않고 끝까지 다 확인해서,
+              //    주소를 못 찾은 줄을 전부 모아 한 번에 빨간 테두리로 표시해줌)
+              showLoading();
+              const destinations = [];
+              const failedRows = [];
+              for (const row of filledRows) {
+                const address = row.querySelector('.dest-address').value + ' ' + row.querySelector('.dest-address-detail').value;
+                try {
+                  const coords = await geocodeAddress(address);
+                  destinations.push({
+                    name: address,
+                    companyName: row.dataset.confirmedCompanyName || null,
+                    latitude: coords.latitude,
+                    longitude: coords.longitude,
+                    flatPalletCount: parseInt(row.querySelector('.dest-flat').value) || 0,
+                    rollPalletCount: parseInt(row.querySelector('.dest-roll').value) || 0,
+                    requestedTime: row.querySelector('.dest-time').value || null
+                  });
+                } catch (e) {
+                  failedRows.push(row);
+                }
+              }
+
+              if (failedRows.length > 0) {
+                hideLoading();
+                failedRows.forEach(function(row) { row.classList.add('dest-row-error'); });
+                failedRows[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+                showError('주소를 찾을 수 없는 집하 동선이 있어요. 빨간 테두리로 표시된 곳의 주소를 다시 선택해주세요.');
+                return;
+              }
+
+              // 2. 전부 모아서 최적화 요청
+              const response = await fetch('/api/route/optimize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ destinations: destinations })
+              });
+
+              if (!response.ok) {
+                hideLoading();
+                showError('동선 계산 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.');
+                return;
+              }
+
+              const result = await response.json();
+
+              // 3. 결과를 다음 페이지로 넘겨서 거기서 보여줌
+              sessionStorage.setItem('optimizeResult', JSON.stringify(result));
+              window.location.href = 'route-result.html';
+            });
+    </script>
+
+<script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html>

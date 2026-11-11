@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>이력 관리</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        .page-header, .history-filter-bar {
+            max-width: 640px;
+        }
+
+        .history-card {
+            cursor: default;
+        }
+
+        .history-card-info {
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .history-detail {
+            width: 100%;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--line);
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button type="button" class="back-button" onclick="history.back()" aria-label="뒤로가기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <h1>이력 관리</h1>
+    </div>
+
+    <div class="history-filter-bar" id="historyFilterBar">
+        <label for="dateFilterStart">기간</label>
+        <input type="date" id="dateFilterStart">
+        <span class="history-filter-sep">~</span>
+        <input type="date" id="dateFilterEnd">
+    </div>
+
+    <div class="history-list" id="historyList"></div>
+    <div class="history-empty" id="historyEmpty" style="display:none;">아직 저장된 최적화 이력이 없어요.</div>
+
+    <script>
+        // 주의: window.history(뒤로가기 버튼용)랑 이름이 겹치면 안 되니까, 변수 이름은 historyItems로 씀
+        let historyItems = [];
+
+        const dateFilterStart = document.getElementById('dateFilterStart');
+        const dateFilterEnd = document.getElementById('dateFilterEnd');
+
+        // 오늘 날짜를 "yyyy-MM-dd"로 (로컬 기준 - UTC로 계산하면 자정 근처에서 하루 밀릴 수 있어서 직접 계산함)
+        function todayDateString() {
+            const now = new Date();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return now.getFullYear() + '-' + month + '-' + day;
+        }
+
+        // 이력이 수천 건 쌓여도 한 번에 다 안 불러오고, 고른 기간만큼만 서버에 요청함
+        // (기본값은 "오늘"만 - 날짜를 직접 바꾸기 전까지는 오늘 치만 보여줌)
+        async function loadHistory() {
+            const params = new URLSearchParams({ start: dateFilterStart.value, end: dateFilterEnd.value });
+            const response = await fetch('/api/route/history?' + params.toString());
+            if (response.status === 401) {
+                window.location.href = 'login.html';
+                return;
+            }
+            historyItems = await response.json();
+            renderHistoryList();
+        }
+
+        // 서버가 주는 "2026-11-09T15:30:00" 같은 형식을 "2026-11-09 15:30"으로 보기 좋게 바꿔줌
+        function formatDateTime(isoString) {
+            return isoString.replace('T', ' ').substring(0, 16);
+        }
+
+        dateFilterStart.addEventListener('change', loadHistory);
+        dateFilterEnd.addEventListener('change', loadHistory);
+
+        function renderHistoryList() {
+            const listEl = document.getElementById('historyList');
+            const emptyEl = document.getElementById('historyEmpty');
+
+            if (historyItems.length === 0) {
+                listEl.style.display = 'none';
+                listEl.innerHTML = '';
+                emptyEl.textContent = '선택한 기간에는 이력이 없어요.';
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+            listEl.style.display = 'flex';
+
+            listEl.innerHTML = '';
+            historyItems.forEach(function(item) {
+                const card = document.createElement('div');
+                card.className = 'history-card';
+                card.innerHTML =
+                    '<div class="history-card-top">' +
+                    '<div class="history-card-info">' +
+                    '<div class="history-date">' + formatDateTime(item.createdAt) + '</div>' +
+                    '<div class="history-meta">' +
+                    '<span>집하 동선 ' + item.destinationCount + '곳</span>' +
+                    '<span>차량 ' + item.vehicleCount + '대</span>' +
+                    '<span>' + item.totalDistanceKm.toFixed(1) + 'km</span>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="history-card-actions">' +
+                    '<button type="button" class="btn-outline btn-xs reuse-btn">재사용</button>' +
+                    '<button type="button" class="btn-outline btn-xs download-btn">다운로드</button>' +
+                    '<button type="button" class="btn-ghost btn-xs delete-btn">삭제</button>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="history-detail" style="display:none;"></div>';
+
+                card.querySelector('.history-card-info').addEventListener('click', function() {
+                    toggleDetail(item.id, card.querySelector('.history-detail'));
+                });
+
+                // 이 이력에 저장돼있던 집하 동선들을 그대로 동선 최적화 화면에 불러와서 다시 계산할 수 있게 해줌
+                card.querySelector('.reuse-btn').addEventListener('click', function() {
+                    reuseHistory(item.id);
+                });
+
+                // 이 이력을 종이 배차표랑 똑같은 틀의 엑셀 파일로 내려받음
+                card.querySelector('.download-btn').addEventListener('click', function() {
+                    downloadHistoryExcel(item.id, item.createdAt);
+                });
+
+                // 이 이력 한 건만 지움 (DB에서도 같이 삭제됨 - 되돌릴 수 없음)
+                card.querySelector('.delete-btn').addEventListener('click', function() {
+                    deleteHistory(item.id, card);
+                });
+
+                listEl.appendChild(card);
+            });
+        }
+
+        // 카드를 누르면 그 날 차량별 전체 경로를 펼쳐서 보여줌 (다시 누르면 접힘)
+        async function toggleDetail(id, detailEl) {
+            const isOpen = detailEl.style.display !== 'none';
+            if (isOpen) {
+                detailEl.style.display = 'none';
+                return;
+            }
+
+            if (detailEl.dataset.loaded === 'true') {
+                detailEl.style.display = 'block';
+                return;
+            }
+
+            detailEl.innerHTML = '<p style="color:var(--slate);font-size:13px;margin:0;">불러오는 중...</p>';
+            detailEl.style.display = 'block';
+
+            const detail = await fetchHistoryDetail(id);
+            if (!detail) {
+                detailEl.innerHTML = '<p style="color:var(--slate);font-size:13px;margin:0;">상세 정보를 불러오지 못했어요.</p>';
+                return;
+            }
+            detailEl.innerHTML = buildVehicleRoutesHtml(detail.vehicleRoutes);
+            detailEl.dataset.loaded = 'true';
+        }
+
+        async function fetchHistoryDetail(id) {
+            const response = await fetch('/api/route/history/' + id);
+            if (!response.ok) {
+                return null;
+            }
+            return await response.json();
+        }
+
+        // route-optimize.html 결과 화면과 똑같은 모양으로 차량별 경로를 그려줌
+        function buildVehicleRoutesHtml(vehicleRoutes) {
+            let html = '';
+            vehicleRoutes.forEach(function(vehicleRoute, index) {
+                const vehicleName = vehicleRoute.vehicle.replace('TON_', '').replace('_', '.') + '톤';
+
+                let totalFlat = 0;
+                let totalRoll = 0;
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    totalFlat += dest.flatPalletCount;
+                    totalRoll += dest.rollPalletCount;
+                });
+
+                html += '<div class="vehicle-card"><h3>차량 ' + (index + 1) + ' (' + vehicleName + ')'
+                    + ' <span class="vehicle-card-load">· 평파렛 ' + totalFlat + '개 / 롤파렛 ' + totalRoll + '개</span></h3>';
+                if (vehicleRoute.capacityUncertain) {
+                    html += '<div class="vehicle-card-warning">⚠️ 이 차량은 표에 없는 조합이라 실제로 다 못 실을 수도 있어요.</div>';
+                }
+                html += '<ol>';
+                vehicleRoute.orderedDestinations.forEach(function(dest, i) {
+                    const legLabel = i === 0 ? '출발지' : vehicleRoute.legDistances[i].toFixed(1) + 'km';
+                    const timeLabel = dest.requestedTime ? dest.requestedTime + ' - ' : '';
+                    const nameLabel = dest.companyName ? '(' + dest.companyName + ')-' + dest.name : dest.name;
+                    html += '<li>' + timeLabel + nameLabel + ' <span class="leg-km">(' + legLabel + ')</span></li>';
+                });
+                html += '</ol></div>';
+            });
+            return html;
+        }
+
+        // 이 이력 안에 있던 차량들의 집하 동선을 전부 모아서(차량 구분 없이) 동선 최적화 화면으로 넘겨줌
+        async function reuseHistory(id) {
+            const detail = await fetchHistoryDetail(id);
+            if (!detail) {
+                alert('이력을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+                return;
+            }
+
+            const destinations = [];
+            detail.vehicleRoutes.forEach(function(vehicleRoute) {
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    destinations.push({
+                        name: dest.name,
+                        companyName: dest.companyName,
+                        isRegisteredCompany: !!dest.companyName,
+                        flatPalletCount: dest.flatPalletCount,
+                        rollPalletCount: dest.rollPalletCount,
+                        requestedTime: dest.requestedTime
+                    });
+                });
+            });
+
+            sessionStorage.setItem('reuseDestinations', JSON.stringify(destinations));
+            window.location.href = 'route-optimize.html';
+        }
+
+        // 평파렛/롤파렛 중 있는 것만 "평4개", "롤3개"처럼 보여줌 (종이 배차표에 적던 "수량" 표기랑 맞춤)
+        function quantityLabel(dest) {
+            const parts = [];
+            if (dest.flatPalletCount > 0) parts.push('평' + dest.flatPalletCount);
+            if (dest.rollPalletCount > 0) parts.push('롤' + dest.rollPalletCount);
+            return (parts.length > 0 ? parts.join('/') : '0') + '개';
+        }
+
+        const WEEKDAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+
+        // vehicleRoutes + 날짜 라벨을 받아서, "차량번호 / 용적 / 구간1 / 구간2 ..." 형태의
+        // 종이 배차표랑 똑같은 틀로 꾸며진 엑셀 워크북을 만들어줌 (줄바꿈/테두리까지 그대로 보이게)
+        function buildDispatchSheetWorkbook(vehicleRoutes, dateLabel) {
+            const maxStops = vehicleRoutes.reduce(function(max, v) { return Math.max(max, v.orderedDestinations.length); }, 0);
+            const totalCols = 2 + maxStops;
+            const thinBorder = { style: 'thin' };
+            const allSides = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
+
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('배차표');
+
+            sheet.mergeCells(1, 1, 1, totalCols);
+            sheet.getCell(1, 1).value = dateLabel;
+            sheet.getCell(1, 1).font = { bold: true, size: 13 };
+            sheet.getRow(1).height = 24;
+
+            const headerValues = ['차량번호', '용적'];
+            for (let i = 1; i <= maxStops; i++) {
+                headerValues.push('구간' + i);
+            }
+            sheet.getRow(2).values = headerValues;
+            sheet.getRow(2).height = 20;
+            sheet.getRow(2).eachCell({ includeEmpty: true }, function(cell) {
+                cell.font = { bold: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = allSides;
+            });
+
+            sheet.getColumn(1).width = 10;
+            sheet.getColumn(2).width = 8;
+            for (let i = 0; i < maxStops; i++) {
+                sheet.getColumn(3 + i).width = 28;
+            }
+
+            vehicleRoutes.forEach(function(vehicleRoute) {
+                const tons = Number(vehicleRoute.vehicle.replace('TON_', '').replace('_', '.')).toString();
+                const rowValues = [vehicleRoute.capacityUncertain ? '⚠️ 용량확인' : '', tons];
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    const companyLabel = dest.companyName || dest.name;
+                    rowValues.push('업체: ' + companyLabel + '\n시간: ' + (dest.requestedTime || '') + '\n수량: ' + quantityLabel(dest) + '\n기타: ');
+                });
+                while (rowValues.length < totalCols) {
+                    rowValues.push('');
+                }
+
+                const row = sheet.addRow(rowValues);
+                row.height = 70;
+                row.eachCell({ includeEmpty: true }, function(cell, colNumber) {
+                    cell.border = allSides;
+                    if (colNumber <= 2) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    } else {
+                        cell.alignment = { wrapText: true, vertical: 'top' };
+                    }
+                });
+                if (vehicleRoute.capacityUncertain) {
+                    row.getCell(1).font = { bold: true, color: { argb: 'FFB45309' } };
+                }
+            });
+
+            return workbook;
+        }
+
+        // 만들어진 워크북을 실제 파일로 다운로드함 (브라우저에서는 writeFile이 아니라 버퍼 → Blob으로 내려받음)
+        async function downloadWorkbook(workbook, filename) {
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // 이 이력을 "차량번호 / 용적 / 구간1 / 구간2 ..." 형태의 종이 배차표랑 똑같은 틀로 내려받음
+        async function downloadHistoryExcel(id, createdAt) {
+            const detail = await fetchHistoryDetail(id);
+            if (!detail) {
+                alert('이력을 불러오지 못했어요. 잠시 후 다시 시도해주세요.');
+                return;
+            }
+
+            // 다운로드 시점이 아니라, 그 이력이 실제로 계산됐던 날짜를 써줌
+            const createdDate = new Date(createdAt);
+            const dateLabel = createdDate.getFullYear() + '년 ' + (createdDate.getMonth() + 1) + '월 ' + createdDate.getDate() + '일 ('
+                + WEEKDAY_NAMES[createdDate.getDay()] + ')';
+
+            const workbook = buildDispatchSheetWorkbook(detail.vehicleRoutes, dateLabel);
+            const dateStr = createdDate.getFullYear() + '-' + String(createdDate.getMonth() + 1).padStart(2, '0') + '-'
+                + String(createdDate.getDate()).padStart(2, '0');
+            await downloadWorkbook(workbook, '배차표_' + dateStr + '.xlsx');
+        }
+
+        async function deleteHistory(id, cardEl) {
+            if (!confirm('이 이력을 삭제할까요? 삭제하면 되돌릴 수 없어요.')) {
+                return;
+            }
+
+            const response = await fetch('/api/route/history/' + id, { method: 'DELETE' });
+            if (!response.ok) {
+                alert('삭제하지 못했어요. 잠시 후 다시 시도해주세요.');
+                return;
+            }
+
+            await loadHistory();
+        }
+
+        dateFilterStart.value = todayDateString();
+        dateFilterEnd.value = todayDateString();
+        loadHistory();
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>업체 관리</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        .page-header, .company-toolbar, .company-list, .company-empty {
+            max-width: 640px;
+        }
+
+        .company-toolbar {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+
+        .company-count {
+            width: 100%;
+            max-width: 640px;
+            margin: 0 0 10px;
+            font-size: 13px;
+            color: var(--slate);
+        }
+
+        .company-list {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .company-card {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-top: 3px solid var(--red);
+            border-radius: 4px;
+            padding: 16px 18px;
+        }
+
+        .company-card-info {
+            min-width: 0;
+        }
+
+        .company-card-name {
+            font-family: var(--font-display);
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+
+        .company-card-address {
+            font-size: 13px;
+            color: var(--slate);
+        }
+
+        .company-card-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .company-card-actions button {
+            padding: 7px 12px;
+            border-radius: 3px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .company-edit-btn {
+            border: 1px solid var(--line);
+            background: var(--surface);
+            color: var(--slate);
+        }
+
+        .company-delete-btn {
+            border: 1px solid var(--red);
+            background: var(--surface);
+            color: var(--red);
+        }
+
+        .company-empty {
+            width: 100%;
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 14px;
+            color: var(--slate);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+        }
+
+        .modal-box input {
+            margin-bottom: 10px;
+        }
+
+        .modal-box input:last-of-type {
+            margin-bottom: 16px;
+        }
+
+        /* 새 업체 등록/수정 팝업은 주소가 길어도 잘 보이도록 더 넓게 */
+        #companyFormModal .modal-box {
+            max-width: 480px;
+        }
+
+        /* 엑셀 가져오기 결과 알림은 줄바꿈 그대로 보여줌 (건너뛴 목록이 길 수 있어서) */
+        #noticeMessage {
+            white-space: pre-line;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button type="button" class="back-button" onclick="history.back()" aria-label="뒤로가기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <h1>업체 관리</h1>
+    </div>
+
+    <div class="company-toolbar">
+        <input type="text" id="companySearchInput" placeholder="업체명으로 찾기">
+        <div class="icon-toolbar">
+            <button type="button" id="companyImportOpenBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">⇪</span>
+                엑셀로 가져오기
+            </button>
+            <button type="button" id="companyAddOpenBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">＋</span>
+                새 업체 등록
+            </button>
+        </div>
+    </div>
+
+    <p class="company-count" id="companyCount"></p>
+
+    <div class="company-list" id="companyList"></div>
+    <div class="company-empty" id="companyEmpty" style="display:none;">아직 등록된 업체가 없어요.</div>
+
+    <!-- 추가/수정 둘 다 이 팝업 하나로 처리함 (제목만 바뀜) -->
+    <div class="modal-overlay" id="companyFormModal">
+        <div class="modal-box">
+            <h3 id="companyFormTitle">새 업체 등록</h3>
+            <input type="text" id="companyFormName" placeholder="업체명 (예: 흙향)">
+            <input type="text" id="companyFormAddress" placeholder="주소 (클릭해서 검색)" readonly onclick="openAddressSearch(this)">
+            <input type="text" id="companyFormDetail" placeholder="상세주소 (동/호수 등, 선택)">
+            <div class="modal-actions">
+                <button type="button" id="companyFormCancelBtn" class="btn-ghost">취소</button>
+                <button type="button" id="companyFormSaveBtn" class="btn-primary">저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 엑셀로 업체 한 번에 등록하기 -->
+    <div class="modal-overlay" id="companyImportModal">
+        <div class="modal-box modal-box-wide">
+            <h3>엑셀로 가져오기</h3>
+            <p>
+                열 순서: <b>업체명 / 주소 / 상세주소</b> (상세주소는 비워도 돼요)<br>
+                표의 첫 줄부터 바로 데이터를 적어주세요 (제목 줄 없이).
+            </p>
+            <div class="excel-file-row">
+                <label for="companyExcelFileInput" class="btn-outline">엑셀 파일 선택</label>
+                <input type="file" id="companyExcelFileInput" accept=".xlsx,.xls,.csv" style="display:none;">
+                <span class="excel-file-name" id="companyExcelFileName">선택된 파일 없음</span>
+            </div>
+            <div class="modal-actions">
+                <button type="button" id="companyImportCancelBtn" class="btn-ghost">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 삭제 확인 팝업 -->
+    <div class="modal-overlay" id="companyDeleteModal">
+        <div class="modal-box">
+            <h3>업체 삭제</h3>
+            <p id="companyDeleteMessage"></p>
+            <div class="modal-actions">
+                <button type="button" id="companyDeleteCancelBtn" class="btn-ghost">취소</button>
+                <button type="button" id="companyDeleteConfirmBtn" class="btn-primary">삭제</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 그냥 알림용 팝업 (등록/수정/삭제 완료, 에러 등) -->
+    <div class="modal-overlay" id="noticeModal">
+        <div class="modal-box">
+            <h3>알림</h3>
+            <p id="noticeMessage"></p>
+            <button type="button" id="noticeConfirmBtn" class="btn-primary">확인</button>
+        </div>
+    </div>
+
+    <script>
+        // 주소 검색창이 이미 떠 있는 동안에는 또 눌러도 새 창을 안 띄움
+        let addressSearchOpen = false;
+
+        function openAddressSearch(inputElement) {
+            if (addressSearchOpen) {
+                return;
+            }
+            addressSearchOpen = true;
+            new daum.Postcode({
+                oncomplete: function(data) {
+                    inputElement.value = data.address;
+                },
+                onclose: function() {
+                    addressSearchOpen = false;
+                }
+            }).open();
+        }
+
+        function showNotice(message) {
+            document.getElementById('noticeMessage').textContent = message;
+            document.getElementById('noticeModal').classList.add('show');
+        }
+        document.getElementById('noticeConfirmBtn').addEventListener('click', function() {
+            document.getElementById('noticeModal').classList.remove('show');
+        });
+
+        let allCompanies = [];      // 서버에서 받아온 전체 업체 목록
+        let editingCompanyId = null; // 지금 수정 중인 업체 id (새로 등록하는 중이면 null)
+        let pendingDeleteId = null;  // 삭제하려고 하는 업체 id
+
+        // 서버에서 전체 업체 목록을 다시 불러와서 화면에 그림
+        async function loadCompanies() {
+            const response = await fetch('/api/companies');
+            if (response.status === 401) {
+                // 로그인이 안 돼있으면(세션 없음) 로그인 화면으로 보냄
+                window.location.href = 'login.html';
+                return;
+            }
+            allCompanies = await response.json();
+            renderCompanies(allCompanies);
+        }
+
+        // 목록을 화면에 그려주는 부분 (검색어로 걸러진 목록을 받아서 그림)
+        function renderCompanies(companies) {
+            const listEl = document.getElementById('companyList');
+            const emptyEl = document.getElementById('companyEmpty');
+            const countEl = document.getElementById('companyCount');
+
+            countEl.textContent = '전체 ' + allCompanies.length + '개 업체 등록됨';
+
+            listEl.innerHTML = '';
+            if (companies.length === 0) {
+                emptyEl.style.display = 'block';
+                return;
+            }
+            emptyEl.style.display = 'none';
+
+            companies.forEach(function(company) {
+                const card = document.createElement('div');
+                card.className = 'company-card';
+                const fullAddress = company.detailAddress ? company.address + ' ' + company.detailAddress : company.address;
+                card.innerHTML = `
+                    <div class="company-card-info">
+                        <div class="company-card-name">${company.name}</div>
+                        <div class="company-card-address">${fullAddress}</div>
+                    </div>
+                    <div class="company-card-actions">
+                        <button type="button" class="company-edit-btn">수정</button>
+                        <button type="button" class="company-delete-btn">삭제</button>
+                    </div>
+                `;
+                card.querySelector('.company-edit-btn').addEventListener('click', function() {
+                    openCompanyForm(company);
+                });
+                card.querySelector('.company-delete-btn').addEventListener('click', function() {
+                    openDeleteConfirm(company);
+                });
+                listEl.appendChild(card);
+            });
+        }
+
+        // 업체명으로 목록 걸러보기 (서버 다시 호출 안 하고, 이미 받아온 목록 안에서 바로 걸러줌)
+        document.getElementById('companySearchInput').addEventListener('input', function() {
+            const keyword = this.value.trim();
+            if (keyword === '') {
+                renderCompanies(allCompanies);
+                return;
+            }
+            const filtered = allCompanies.filter(function(c) {
+                return c.name.includes(keyword);
+            });
+            renderCompanies(filtered);
+        });
+
+        // 등록/수정 팝업을 여는 함수. company를 안 넘기면 "새로 등록" 모드, 넘기면 "수정" 모드
+        function openCompanyForm(company) {
+            editingCompanyId = company ? company.id : null;
+            document.getElementById('companyFormTitle').textContent = company ? '업체 정보 수정' : '새 업체 등록';
+            document.getElementById('companyFormName').value = company ? company.name : '';
+            document.getElementById('companyFormAddress').value = company ? company.address : '';
+            document.getElementById('companyFormDetail').value = company && company.detailAddress ? company.detailAddress : '';
+            document.getElementById('companyFormModal').classList.add('show');
+        }
+
+        document.getElementById('companyAddOpenBtn').addEventListener('click', function() {
+            openCompanyForm(null);
+        });
+
+        // 엑셀로 여러 업체 한 번에 등록하기
+        const companyImportModal = document.getElementById('companyImportModal');
+        const companyExcelFileInput = document.getElementById('companyExcelFileInput');
+        const companyExcelFileName = document.getElementById('companyExcelFileName');
+
+        document.getElementById('companyImportOpenBtn').addEventListener('click', function() {
+            companyImportModal.classList.add('show');
+            companyExcelFileInput.value = '';
+            companyExcelFileName.textContent = '선택된 파일 없음';
+        });
+
+        document.getElementById('companyImportCancelBtn').addEventListener('click', function() {
+            companyImportModal.classList.remove('show');
+        });
+
+        companyImportModal.addEventListener('click', function(event) {
+            if (event.target === companyImportModal) {
+                companyImportModal.classList.remove('show');
+            }
+        });
+
+        companyExcelFileInput.addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            companyExcelFileName.textContent = file.name;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                let rows;
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                } catch (err) {
+                    showNotice('엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요.');
+                    return;
+                }
+                await importCompaniesFromRows(rows);
+            };
+            reader.onerror = function() {
+                showNotice('엑셀 파일을 읽지 못했어요.');
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // rows: [[업체명, 주소, 상세주소], ...] - 한 줄씩 순서대로 등록 요청을 보냄
+        // (이름/주소가 이미 있어서 막히는 줄은 건너뛰고 계속 진행함)
+        async function importCompaniesFromRows(rows) {
+            const candidates = [];
+            for (const cells of rows) {
+                if (!cells) continue;
+                const name = (cells[0] || '').toString().trim();
+                const address = (cells[1] || '').toString().trim();
+                const detailAddress = (cells[2] || '').toString().trim();
+                if (name === '' || address === '') continue; // 업체명/주소 둘 다 있어야 등록 가능
+                candidates.push({ name: name, address: address, detailAddress: detailAddress || null });
+            }
+
+            if (candidates.length === 0) {
+                showNotice('가져올 수 있는 줄이 없어요. 업체명과 주소가 둘 다 있어야 해요.');
+                return;
+            }
+
+            let successCount = 0;
+            const failed = [];
+            for (const candidate of candidates) {
+                try {
+                    const response = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(candidate)
+                    });
+                    if (response.ok) {
+                        successCount++;
+                    } else {
+                        const errorBody = await response.json();
+                        failed.push(candidate.name + '(' + (errorBody.message || '등록 실패') + ')');
+                    }
+                } catch (e) {
+                    failed.push(candidate.name + '(등록 실패)');
+                }
+            }
+
+            companyImportModal.classList.remove('show');
+            await loadCompanies();
+
+            let message = successCount + '개 업체를 등록했어요.';
+            if (failed.length > 0) {
+                message += '\n건너뛴 ' + failed.length + '개: ' + failed.join(', ');
+            }
+            showNotice(message);
+        }
+
+        document.getElementById('companyFormCancelBtn').addEventListener('click', function() {
+            document.getElementById('companyFormModal').classList.remove('show');
+        });
+
+        // 저장 버튼: editingCompanyId가 있으면 수정(PUT), 없으면 새로 등록(POST)
+        document.getElementById('companyFormSaveBtn').addEventListener('click', async function() {
+            const name = document.getElementById('companyFormName').value.trim();
+            const address = document.getElementById('companyFormAddress').value.trim();
+            const detailAddress = document.getElementById('companyFormDetail').value.trim() || null;
+
+            if (name === '' || address === '') {
+                showNotice('업체명과 주소를 모두 입력해주세요.');
+                return;
+            }
+
+            try {
+                let response;
+                if (editingCompanyId) {
+                    response = await fetch('/api/companies/' + editingCompanyId, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name, address: address, detailAddress: detailAddress })
+                    });
+                } else {
+                    response = await fetch('/api/companies', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: name, address: address, detailAddress: detailAddress })
+                    });
+                }
+
+                if (!response.ok) {
+                    // 이름/주소가 이미 등록되어 있을 때(409) 서버가 보내주는 메시지를 그대로 보여줌
+                    const errorBody = await response.json();
+                    showNotice(errorBody.message || '저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+                    return;
+                }
+
+                document.getElementById('companyFormModal').classList.remove('show');
+                await loadCompanies();
+                showNotice(editingCompanyId ? '수정됐어요.' : '등록됐어요.');
+            } catch (e) {
+                showNotice('저장에 실패했어요. 잠시 후 다시 시도해주세요.');
+            }
+        });
+
+        function openDeleteConfirm(company) {
+            pendingDeleteId = company.id;
+            document.getElementById('companyDeleteMessage').textContent =
+                '"' + company.name + '"을(를) 삭제하시겠습니까? 되돌릴 수 없어요.';
+            document.getElementById('companyDeleteModal').classList.add('show');
+        }
+
+        document.getElementById('companyDeleteCancelBtn').addEventListener('click', function() {
+            document.getElementById('companyDeleteModal').classList.remove('show');
+            pendingDeleteId = null;
+        });
+
+        document.getElementById('companyDeleteConfirmBtn').addEventListener('click', async function() {
+            if (!pendingDeleteId) return;
+            const id = pendingDeleteId;
+            pendingDeleteId = null;
+            document.getElementById('companyDeleteModal').classList.remove('show');
+
+            try {
+                await fetch('/api/companies/' + id, { method: 'DELETE' });
+                await loadCompanies();
+                showNotice('삭제됐어요.');
+            } catch (e) {
+                showNotice('삭제에 실패했어요. 잠시 후 다시 시도해주세요.');
+            }
+        });
+
+        loadCompanies();
+    </script>
+
+    <script src="//t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>최적화 결과</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        .page-header {
+            max-width: 640px;
+        }
+
+        .result-wrap {
+            width: 100%;
+            max-width: 640px;
+        }
+
+        .result-summary {
+            display: flex;
+            gap: 16px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            color: var(--slate);
+            margin: 0 0 16px;
+        }
+
+        .result-empty {
+            text-align: center;
+            padding: 60px 20px;
+            font-size: 14px;
+            color: var(--slate);
+            background: var(--surface);
+            border: 1px solid var(--line);
+            border-radius: 4px;
+        }
+
+        .result-actions {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page-header">
+        <button type="button" class="back-button" onclick="window.location.href='main.html'" aria-label="뒤로가기">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </button>
+        <h1>최적화 결과</h1>
+    </div>
+
+    <div class="result-wrap">
+        <div class="result-summary" id="resultSummary"></div>
+        <div id="resultArea"></div>
+        <div class="result-empty" id="resultEmpty" style="display:none;">
+            결과 정보가 없어요. 동선 최적화 화면에서 "최적화 시작"을 다시 눌러주세요.
+        </div>
+        <div class="icon-toolbar result-actions">
+            <button type="button" id="reEditBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">✎</span>
+                동선 다시 입력하기
+            </button>
+            <button type="button" id="downloadExcelBtn" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">⇩</span>
+                엑셀로 다운로드
+            </button>
+            <a href="history.html" class="icon-toolbar-btn">
+                <span class="icon-toolbar-icon">☰</span>
+                이력에서 보기
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // route-optimize.html에서 "최적화 시작"을 누르면 그 결과를 여기로 넘겨받아서 그려줌
+        const raw = sessionStorage.getItem('optimizeResult');
+        const resultArea = document.getElementById('resultArea');
+        const resultSummary = document.getElementById('resultSummary');
+        const resultEmpty = document.getElementById('resultEmpty');
+
+        let result = null;
+        if (raw) {
+            try {
+                result = JSON.parse(raw);
+            } catch (e) {
+                result = null;
+            }
+        }
+
+        const downloadExcelBtn = document.getElementById('downloadExcelBtn');
+
+        if (!result || !Array.isArray(result) || result.length === 0) {
+            resultEmpty.style.display = 'block';
+            downloadExcelBtn.style.display = 'none';
+        } else {
+            renderSummary(result);
+            resultArea.innerHTML = buildVehicleRoutesHtml(result);
+        }
+
+        // 평파렛/롤파렛 중 있는 것만 "평4개", "롤3개"처럼 보여줌 (종이 배차표에 적던 "수량" 표기랑 맞춤)
+        function quantityLabel(dest) {
+            const parts = [];
+            if (dest.flatPalletCount > 0) parts.push('평' + dest.flatPalletCount);
+            if (dest.rollPalletCount > 0) parts.push('롤' + dest.rollPalletCount);
+            return (parts.length > 0 ? parts.join('/') : '0') + '개';
+        }
+
+        const WEEKDAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
+
+        // vehicleRoutes + 날짜 라벨을 받아서, "차량번호 / 용적 / 구간1 / 구간2 ..." 형태의
+        // 종이 배차표랑 똑같은 틀로 꾸며진 엑셀 워크북을 만들어줌 (줄바꿈/테두리까지 그대로 보이게)
+        function buildDispatchSheetWorkbook(vehicleRoutes, dateLabel) {
+            const maxStops = vehicleRoutes.reduce(function(max, v) { return Math.max(max, v.orderedDestinations.length); }, 0);
+            const totalCols = 2 + maxStops;
+            const thinBorder = { style: 'thin' };
+            const allSides = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
+
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('배차표');
+
+            sheet.mergeCells(1, 1, 1, totalCols);
+            sheet.getCell(1, 1).value = dateLabel;
+            sheet.getCell(1, 1).font = { bold: true, size: 13 };
+            sheet.getRow(1).height = 24;
+
+            const headerValues = ['차량번호', '용적'];
+            for (let i = 1; i <= maxStops; i++) {
+                headerValues.push('구간' + i);
+            }
+            sheet.getRow(2).values = headerValues;
+            sheet.getRow(2).height = 20;
+            sheet.getRow(2).eachCell({ includeEmpty: true }, function(cell) {
+                cell.font = { bold: true };
+                cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                cell.border = allSides;
+            });
+
+            sheet.getColumn(1).width = 10;
+            sheet.getColumn(2).width = 8;
+            for (let i = 0; i < maxStops; i++) {
+                sheet.getColumn(3 + i).width = 28;
+            }
+
+            vehicleRoutes.forEach(function(vehicleRoute) {
+                const tons = Number(vehicleRoute.vehicle.replace('TON_', '').replace('_', '.')).toString();
+                const rowValues = [vehicleRoute.capacityUncertain ? '⚠️ 용량확인' : '', tons];
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    const companyLabel = dest.companyName || dest.name;
+                    rowValues.push('업체: ' + companyLabel + '\n시간: ' + (dest.requestedTime || '') + '\n수량: ' + quantityLabel(dest) + '\n기타: ');
+                });
+                while (rowValues.length < totalCols) {
+                    rowValues.push('');
+                }
+
+                const row = sheet.addRow(rowValues);
+                row.height = 70;
+                row.eachCell({ includeEmpty: true }, function(cell, colNumber) {
+                    cell.border = allSides;
+                    if (colNumber <= 2) {
+                        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+                    } else {
+                        cell.alignment = { wrapText: true, vertical: 'top' };
+                    }
+                });
+                if (vehicleRoute.capacityUncertain) {
+                    row.getCell(1).font = { bold: true, color: { argb: 'FFB45309' } };
+                }
+            });
+
+            return workbook;
+        }
+
+        // 만들어진 워크북을 실제 파일로 다운로드함 (브라우저에서는 writeFile이 아니라 버퍼 → Blob으로 내려받음)
+        async function downloadWorkbook(workbook, filename) {
+            const buffer = await workbook.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // 결과를 "차량번호 / 용적 / 구간1 / 구간2 ..." 형태의 종이 배차표랑 똑같은 틀로 내려받음
+        downloadExcelBtn.addEventListener('click', async function() {
+            const today = new Date();
+            const dateLabel = today.getFullYear() + '년 ' + (today.getMonth() + 1) + '월 ' + today.getDate() + '일 ('
+                + WEEKDAY_NAMES[today.getDay()] + ')';
+
+            const workbook = buildDispatchSheetWorkbook(result, dateLabel);
+            const dateStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            await downloadWorkbook(workbook, '배차표_' + dateStr + '.xlsx');
+        });
+
+        // "동선 다시 입력하기" - 지금 결과에 들어있던 집하 동선들을 그대로 동선 최적화 화면에 불러와서 다시 고칠 수 있게 해줌
+        document.getElementById('reEditBtn').addEventListener('click', function() {
+            if (!result) {
+                window.location.href = 'route-optimize.html';
+                return;
+            }
+            const destinations = [];
+            result.forEach(function(vehicleRoute) {
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    destinations.push({
+                        name: dest.name,
+                        companyName: dest.companyName,
+                        isRegisteredCompany: !!dest.companyName,
+                        flatPalletCount: dest.flatPalletCount,
+                        rollPalletCount: dest.rollPalletCount,
+                        requestedTime: dest.requestedTime
+                    });
+                });
+            });
+            sessionStorage.setItem('reuseDestinations', JSON.stringify(destinations));
+            window.location.href = 'route-optimize.html';
+        });
+
+        function renderSummary(vehicleRoutes) {
+            let totalDistanceKm = 0;
+            vehicleRoutes.forEach(function(vehicleRoute) {
+                vehicleRoute.legDistances.forEach(function(leg) {
+                    totalDistanceKm += leg;
+                });
+            });
+            resultSummary.innerHTML =
+                '<span>차량 ' + vehicleRoutes.length + '대</span>' +
+                '<span>총 ' + totalDistanceKm.toFixed(1) + 'km</span>';
+        }
+
+        // history.html의 이력 상세보기와 똑같은 모양으로 차량별 경로를 그려줌
+        function buildVehicleRoutesHtml(vehicleRoutes) {
+            let html = '';
+            vehicleRoutes.forEach(function(vehicleRoute, index) {
+                const vehicleName = vehicleRoute.vehicle.replace('TON_', '').replace('_', '.') + '톤';
+
+                let totalFlat = 0;
+                let totalRoll = 0;
+                vehicleRoute.orderedDestinations.forEach(function(dest) {
+                    totalFlat += dest.flatPalletCount;
+                    totalRoll += dest.rollPalletCount;
+                });
+
+                html += '<div class="vehicle-card"><h3>차량 ' + (index + 1) + ' (' + vehicleName + ')'
+                    + ' <span class="vehicle-card-load">· 평파렛 ' + totalFlat + '개 / 롤파렛 ' + totalRoll + '개</span></h3>';
+                if (vehicleRoute.capacityUncertain) {
+                    html += '<div class="vehicle-card-warning">⚠️ 이 차량은 표에 없는 조합이라 실제로 다 못 실을 수도 있어요.</div>';
+                }
+                html += '<ol>';
+                vehicleRoute.orderedDestinations.forEach(function(dest, i) {
+                    const legLabel = i === 0 ? '출발지' : vehicleRoute.legDistances[i].toFixed(1) + 'km';
+                    const timeLabel = dest.requestedTime ? dest.requestedTime + ' - ' : '';
+                    const nameLabel = dest.companyName ? '(' + dest.companyName + ')-' + dest.name : dest.name;
+                    html += '<li>' + timeLabel + nameLabel + ' <span class="leg-km">(' + legLabel + ')</span></li>';
+                });
+                html += '</ol></div>';
+            });
+            return html;
+        }
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+</body>
+</html>

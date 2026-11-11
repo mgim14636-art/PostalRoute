@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>아이디 찾기</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="center-page">
+      <div class="auth-shell">
+        <div class="page-header">
+            <button type="button" class="back-button" onclick="history.back()" aria-label="뒤로가기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            <h1>아이디 찾기</h1>
+        </div>
+        <div class="panel">
+          <form class="form-stack">
+            <input type="text" id="name" name="name" placeholder="이름">
+            <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="휴대폰 번호">
+            <button type="submit" class="btn-primary btn-block">아이디 찾기</button>
+          </form>
+        </div>
+      </div>
+
+      <div class="modal-overlay" id="findIdModal">
+        <div class="modal-box">
+          <h3>아이디 찾기 결과</h3>
+          <p id="findIdMessage"></p>
+          <button type="button" id="findIdConfirmBtn" class="btn-primary">확인</button>
+        </div>
+      </div>
+
+      <script>
+          // 휴대폰 번호를 입력하면 숫자만 남겨서 010-1234-5678 형태로 자동으로 - 를 넣어주는 부분
+          document.getElementById('phoneNumber').addEventListener('input', function() {
+              const digits = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+              if (digits.length < 4) {
+                  this.value = digits;
+              } else if (digits.length < 8) {
+                  this.value = digits.slice(0, 3) + '-' + digits.slice(3);
+              } else if (digits.length < 11) {
+                  this.value = digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
+              } else {
+                  this.value = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7);
+              }
+          });
+
+          document.querySelector('form').addEventListener('submit', function(event) {
+          event.preventDefault();
+
+          const name = document.getElementById('name').value;
+          const phoneNumber = document.getElementById('phoneNumber').value;
+
+          fetch('/api/find-id', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, phoneNumber: phoneNumber })
+          })
+          .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+          .then(function(result) {
+          const messageEl = document.getElementById('findIdMessage');
+          if (result.ok) {
+            messageEl.textContent = '회원님 아이디는 : ' + result.data.username;
+          } else {
+            messageEl.textContent = '정보가 일치하는 회원이 없습니다.';
+          }
+          document.getElementById('findIdModal').classList.add('show');
+          });
+      });
+
+      // 확인 버튼을 누르면 팝업을 닫고 로그인 화면으로 이동
+      document.getElementById('findIdConfirmBtn').addEventListener('click', function() {
+          window.location.href = 'login.html';
+      });
+      </script>
+</body>
+</html>

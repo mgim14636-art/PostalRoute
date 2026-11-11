@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>회원가입</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+</head>
+<body class="center-page">
+    <div class="auth-shell">
+        <div class="page-header">
+            <button type="button" class="back-button" onclick="history.back()" aria-label="뒤로가기">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+            </button>
+            <h1>회원가입</h1>
+        </div>
+        <div class="panel">
+            <form class="form-stack">
+                <input type="text" id="name" name="name" placeholder="이름">
+                <input type="text" id="username" name="username" placeholder="아이디">
+                <div class="password-field">
+                    <input type="password" id="password" name="password" placeholder="비밀번호">
+                    <button type="button" class="eye-button" onclick="togglePassword('password')">👁</button>
+                </div>
+                <p class="field-error" id="passwordError">9자 이상으로 작성해주세요.</p>
+                <div class="password-field">
+                    <input type="password" id="password_recheck" name="password_recheck" placeholder="비밀번호 재확인">
+                    <button type="button" class="eye-button" onclick="togglePassword('password_recheck')">👁</button>
+                </div>
+                <input type="tel" id="phoneNumber" name="phoneNumber" placeholder="휴대폰 번호">
+                <button type="submit" class="btn-primary btn-block">가입하기</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="signupModal">
+      <div class="modal-box">
+        <h3>알림</h3>
+        <p id="signupMessage"></p>
+        <button type="button" id="signupConfirmBtn" class="btn-primary">확인</button>
+      </div>
+    </div>
+
+    <script>
+        let signupSucceeded = false;
+
+        // 휴대폰 번호를 입력하면 숫자만 남겨서 010-1234-5678 형태로 자동으로 - 를 넣어주는 부분
+        document.getElementById('phoneNumber').addEventListener('input', function() {
+            const digits = this.value.replace(/[^0-9]/g, '').slice(0, 11);
+            if (digits.length < 4) {
+                this.value = digits;
+            } else if (digits.length < 8) {
+                this.value = digits.slice(0, 3) + '-' + digits.slice(3);
+            } else if (digits.length < 11) {
+                this.value = digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
+            } else {
+                this.value = digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7);
+            }
+        });
+
+        // 비밀번호를 입력하는 동안, 9자가 안 되면 아래에 안내 문구를 보여주는 부분
+        document.getElementById('password').addEventListener('input', function() {
+            const passwordError = document.getElementById('passwordError');
+            if (this.value.length > 0 && this.value.length < 9) {
+                passwordError.classList.add('show');
+            } else {
+                passwordError.classList.remove('show');
+            }
+        });
+
+        document.querySelector('form').addEventListener('submit', function(event) {
+          event.preventDefault();
+
+          const name = document.getElementById('name').value;
+          const username = document.getElementById('username').value;
+          const password = document.getElementById('password').value;
+          const passwordRecheck = document.getElementById('password_recheck').value;
+          const phoneNumber = document.getElementById('phoneNumber').value;
+
+          if (password.length < 9) {
+          document.getElementById('passwordError').classList.add('show');
+          return;
+          }
+
+          if (password !== passwordRecheck) {
+          alert('비밀번호가 일치하지 않습니다.');
+          return;
+          }
+
+          fetch('/api/signup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: name, username: username, password: password, phoneNumber: phoneNumber })
+          })
+            .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+            .then(result => {
+              console.log('가입 응답:', result.data);
+              signupSucceeded = result.ok;
+              document.getElementById('signupMessage').textContent = result.ok
+                ? '회원가입이 완료되었습니다!'
+                : '이미 사용 중인 아이디입니다.';
+              document.getElementById('signupModal').classList.add('show');
+            });
+        });
+
+        // 확인 버튼을 누르면, 가입이 성공했을 때만 로그인 화면으로 이동
+        document.getElementById('signupConfirmBtn').addEventListener('click', function() {
+            document.getElementById('signupModal').classList.remove('show');
+            if (signupSucceeded) {
+              window.location.href = 'login.html';
+            }
+        });
+
+        function togglePassword(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+    </script>
+</body>
+</html>

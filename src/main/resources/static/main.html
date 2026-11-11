@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>메인</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@700&family=Noto+Sans+KR:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/theme.css">
+    <style>
+        .top-bar {
+            justify-content: space-between;
+        }
+
+        .top-bar h1 {
+            font-size: 28px;
+            letter-spacing: -0.02em;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1><span class="brand-postal">Postal</span><span class="brand-route">Route</span></h1>
+        <div class="user-badge">
+            <span id="userGreeting">반갑습니다</span>
+            <button type="button" class="btn-ghost" id="logoutBtn">로그아웃</button>
+        </div>
+    </div>
+
+    <div class="menu-grid">
+        <a class="menu-card" href="route-optimize.html">
+            <h2>동선 최적화</h2>
+            <p>집하 동선 주소, 파렛 수, 요청 시간을 입력하면 차량별 방문 순서를 자동으로 계산해요.</p>
+            <span class="menu-card-arrow">시작하기 →</span>
+        </a>
+        <a class="menu-card" href="history.html">
+            <h2>이력 관리</h2>
+            <p>지금까지 계산했던 동선 결과를 날짜별로 다시 확인할 수 있어요.</p>
+            <span class="menu-card-arrow">이력 보기 →</span>
+        </a>
+        <a class="menu-card" href="companies.html">
+            <h2>업체 관리</h2>
+            <p>자주 쓰는 업체 이름과 주소를 등록·수정·삭제해두면, 동선 입력할 때 이름만으로 바로 찾을 수 있어요.</p>
+            <span class="menu-card-arrow">업체 관리 →</span>
+        </a>
+    </div>
+
+    <script>
+        // 로그인할 때 저장해둔 아이디가 있으면 환영 문구에 보여줌
+        const savedUsername = sessionStorage.getItem('loginUsername');
+        if (savedUsername) {
+            document.getElementById('userGreeting').textContent = savedUsername + '님 반갑습니다';
+        }
+
+        // 로그아웃 - 서버한테도 "로그인 상태 지워줘"라고 알려주고(세션 종료), 화면에 저장해둔 것도 같이 지움
+        document.getElementById('logoutBtn').addEventListener('click', async function() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+            } catch (e) {
+                // 서버 로그아웃이 실패해도 화면에서는 어차피 로그인 화면으로 보냄
+            }
+            sessionStorage.clear();
+            window.location.href = 'login.html';
+        });
+    </script>
+</body>
+</html>

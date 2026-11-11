@@ -1,0 +1,7 @@
+spring.datasource.url=jdbc:mariadb://localhost:3306/postal_db
+spring.datasource.username=root
+spring.datasource.password=여기에_DB_비밀번호_입력
+
+spring.jpa.hibernate.ddl-auto=update
+
+kakao.api.key=여기에_카카오_API_키_입력

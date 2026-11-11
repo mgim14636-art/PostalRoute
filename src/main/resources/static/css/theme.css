@@ -1,0 +1,668 @@
+/* ============================================================
+   우체국 동선 최적화 - 공통 디자인 토큰 (theme.css)
+   모든 화면이 이 파일을 함께 불러와서 같은 색/글꼴/부품을 씁니다.
+   ============================================================ */
+
+:root {
+  --ink: #1f2023;
+  --paper: #faf7f2;
+  --red: #c81e2c;
+  --red-deep: #8f1420;
+  --line: #ddd8d0;
+  --slate: #6b6f76;
+  --surface: #ffffff;
+  --input-bg: #f5f2ec;
+
+  --font-display: 'Noto Serif KR', serif;
+  --font-body: 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Noto Sans KR', monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: var(--font-body);
+  color: var(--ink);
+  padding: 60px 16px;
+  background-color: var(--paper);
+  background-image:
+    linear-gradient(rgba(31, 32, 35, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(31, 32, 35, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* 로그인/회원가입류 작은 카드 화면을 화면 정가운데로 띄울 때 body에 붙이는 클래스 */
+body.center-page {
+  justify-content: center;
+  min-height: 100vh;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 28px;
+}
+
+h2 {
+  margin: 0 0 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  border-left: 4px solid var(--red);
+  padding-left: 8px;
+}
+
+/* 카드 - 위쪽에 빨간 띠를 둬서 우체국 서류/전표 느낌 */
+.panel {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 28px 24px;
+}
+
+.form-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+input,
+select {
+  width: 100%;
+  padding: 11px 12px;
+  background-color: var(--input-bg);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+input::placeholder {
+  color: #a39e94;
+}
+
+input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--red);
+  background-color: var(--surface);
+}
+
+.password-field {
+  position: relative;
+}
+
+/* 입력칸 아래 자잘한 안내/에러 문구 (예: 비밀번호 자릿수 제한) */
+.field-error {
+  display: none;
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--red);
+}
+
+.field-error.show {
+  display: block;
+}
+
+.eye-button {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 15px;
+  color: var(--slate);
+}
+
+/* 카드 묶음(.auth-shell) - 화면 정가운데 기준을 "제목 포함 전체"가 아니라
+   카드(.panel) 하나로 맞추기 위한 틀. 제목/뒤로가기는 absolute로 띄워서
+   카드 위 공간을 차지하지 않게 하고, 그래서 카드 자체가 화면 정가운데에 옴 */
+.auth-shell {
+  position: relative;
+  width: 100%;
+  max-width: 360px;
+  margin-bottom: 80px;
+}
+
+.auth-shell > h1 {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  margin: 0 0 28px;
+  text-align: center;
+}
+
+/* 제목 줄 - [뒤로가기][제목(가운데)][빈 칸] 3칸으로 나눠서,
+   뒤로가기 버튼이 있어도 제목이 줄 전체 기준 정가운데에 오도록 함.
+   로그인류 작은 카드 화면(.auth-shell) 안에서는 카드 위에 떠 있고,
+   동선 최적화/이력 같은 넓은 화면에서는 그냥 맨 위에 보통 줄로 놓임 */
+.page-header {
+  width: 100%;
+  margin: 0 0 28px;
+  display: grid;
+  grid-template-columns: 36px 1fr 36px;
+  align-items: center;
+}
+
+.auth-shell > .page-header {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+}
+
+.page-header h1 {
+  grid-column: 2;
+  margin: 0;
+  text-align: center;
+}
+
+/* 메인/이력 등 "위에서부터 쭉" 보여주는 넓은 화면의 상단 줄
+   (뒤로가기 버튼 + 제목, 또는 제목 + 로그아웃 같은 걸 한 줄에 배치) */
+.top-bar {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.top-bar h1 {
+  margin: 0;
+}
+
+/* "Postal"/"Route" 두 가지 색으로 나눠 보여주는 브랜드 워드마크 글자 (로그인, 메인 등에서 같이 씀) */
+.brand-postal {
+  color: var(--ink);
+}
+
+.brand-route {
+  color: var(--red);
+}
+
+.user-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--slate);
+}
+
+.menu-grid {
+  width: 100%;
+  max-width: 640px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.menu-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 24px;
+  text-decoration: none;
+  color: var(--ink);
+}
+
+.menu-card:hover {
+  border-top-color: var(--red-deep);
+}
+
+.menu-card h2 {
+  margin: 0;
+  border: none;
+  padding: 0;
+  font-family: var(--font-display);
+  font-size: 16px;
+}
+
+.menu-card p {
+  flex: 1;
+  margin: 0;
+  font-size: 13px;
+  color: var(--slate);
+  line-height: 1.5;
+}
+
+.menu-card-arrow {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--red);
+}
+
+/* 이력 보기 같은 목록 화면용 카드 */
+.history-list {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.history-card {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 18px 20px;
+}
+
+.history-date {
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.history-meta {
+  display: flex;
+  gap: 16px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--slate);
+}
+
+.history-empty {
+  width: 100%;
+  max-width: 640px;
+  text-align: center;
+  padding: 60px 20px;
+  font-size: 14px;
+  color: var(--slate);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+/* 이력 목록 위 날짜 필터 */
+.history-filter-bar {
+  width: 100%;
+  max-width: 640px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.history-filter-bar label {
+  font-size: 12px;
+  color: var(--slate);
+  margin-right: 2px;
+}
+
+.history-filter-bar select,
+.history-filter-bar input {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 13px;
+}
+
+.history-filter-sep {
+  color: var(--slate);
+}
+
+.history-filter-reset {
+  padding: 7px 16px;
+  border: 1px solid var(--line);
+  background: var(--input-bg);
+  border-radius: 20px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--slate);
+  cursor: pointer;
+  transition: border-color .15s ease, color .15s ease, background-color .15s ease;
+}
+
+.history-filter-reset:hover {
+  border-color: var(--red);
+  color: var(--red-deep);
+  background: var(--surface);
+}
+
+/* 아이콘 + 글자가 세로로 쌓인 동그란 버튼들 (동선 최적화, 업체 관리 툴바에서 같이 씀) */
+.icon-toolbar {
+  display: flex;
+  gap: 10px;
+}
+
+.icon-toolbar-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 8px;
+  background-color: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(31, 32, 35, 0.06);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.icon-toolbar-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(200, 30, 44, 0.18);
+  border-color: var(--red);
+  color: var(--red-deep);
+}
+
+.icon-toolbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fbeceb;
+  color: var(--red);
+  font-size: 15px;
+  line-height: 1;
+}
+
+/* 엑셀 파일 올려서 가져오기 팝업 (동선 최적화, 업체 관리에서 같이 씀) */
+.modal-box-wide {
+  max-width: 480px;
+  text-align: left;
+}
+
+.excel-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.excel-file-row label {
+  cursor: pointer;
+}
+
+.excel-file-name {
+  font-size: 13px;
+  color: var(--slate);
+}
+
+/* 이력 카드 안 날짜/요약과 재사용·삭제 버튼을 좌우로 나누는 줄 */
+.history-card-top {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-card-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-outline.btn-xs,
+.btn-ghost.btn-xs {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+/* 차량별 경로 카드 - 동선 최적화 결과 화면, 이력 상세보기에서 같이 씀 */
+.vehicle-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.vehicle-card h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.vehicle-card-load {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--slate);
+}
+
+/* 용량표에 없는 조합이라 어쩔 수 없이 제일 큰 차로 배정됐을 때 보여주는 경고 */
+.vehicle-card-warning {
+  margin: 6px 0 10px;
+  padding: 7px 10px;
+  background: #fff4e5;
+  border: 1px solid #f0c36d;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #8a5a00;
+}
+
+.vehicle-card ol {
+  padding-left: 20px;
+  margin: 0;
+}
+
+.vehicle-card li {
+  margin-bottom: 6px;
+  font-size: 14px;
+}
+
+.vehicle-card li .leg-km {
+  font-family: var(--font-mono);
+  color: var(--slate);
+}
+
+/* 뒤로가기 버튼 - 동그란 아이콘 버튼 */
+.back-button {
+  grid-column: 1;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--slate);
+  cursor: pointer;
+}
+
+.back-button:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.back-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.back-button:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* 버튼 */
+.btn-primary {
+  padding: 12px 20px;
+  background-color: var(--red);
+  color: #fff;
+  border: none;
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--red-deep);
+}
+
+.btn-outline {
+  padding: 10px 16px;
+  background: var(--surface);
+  color: var(--red);
+  border: 1px solid var(--red);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+
+.btn-outline:hover {
+  background-color: #fbeceb;
+}
+
+.btn-ghost {
+  padding: 9px 14px;
+  background: var(--surface);
+  color: var(--slate);
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.btn-ghost:hover {
+  border-color: #bdb8ae;
+}
+
+.btn-block {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 팝업(모달) */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  background: rgba(20, 18, 16, 0.5);
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal-box {
+  width: 90%;
+  max-width: 320px;
+  margin-bottom: 80px;
+  background: var(--surface);
+  border-top: 3px solid var(--red);
+  border-radius: 4px;
+  padding: 26px 24px;
+  box-shadow: 0 16px 40px rgba(20, 18, 16, 0.25);
+  text-align: center;
+}
+
+.modal-box h3 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+}
+
+.modal-box p {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--slate);
+  line-height: 1.5;
+}
+
+.modal-box input {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.modal-actions .btn-primary,
+.modal-actions .btn-ghost {
+  padding: 10px 20px;
+  font-size: 14px;
+}
+
+/* 시간이 좀 걸리는 작업(동선 최적화 등) 중에 보여주는 로딩 팝업 */
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.loading-spinner {
+  width: 36px;
+  height: 36px;
+  border: 4px solid var(--line);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: loading-spin 0.8s linear infinite;
+}
+
+@keyframes loading-spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-box p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink);
+  font-weight: 600;
+}
