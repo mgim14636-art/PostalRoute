@@ -174,7 +174,18 @@ erDiagram
 | total_distance_km | DOUBLE | NOT NULL | 전체 이동 거리 합 |
 | result_json | LONGTEXT | | 계산 결과(차량별 전체 경로) 저장, 상세보기·재계산·엑셀 다운로드에 재사용 |
 
-`user_id`는 JPA 연관관계(`@ManyToOne`) 없이 단순 컬럼으로만 연결되어 있다 (조회 시 애플리케이션 코드에서 직접 필터링).
+### 3. 프로젝트 구조
+
+```
+src/main/java/com/postalroute/backend/
+├── route/      # 동선 최적화 핵심 로직 (시간 기준 묶기, 용량 분할, 거리 계산)
+├── vehicle/    # 차량 톤수별 적재 기준표
+├── history/    # 이력 저장/조회/삭제
+├── company/    # 업체(주소록) 관리
+└── user/       # 로그인/회원가입
+
+src/main/resources/static/   # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
+```
 
 ## 실행 방법
 
@@ -191,16 +202,3 @@ erDiagram
    ./gradlew bootRun
    ```
 4. 브라우저에서 `http://localhost:8080/login.html` 로 접속한다.
-
-## 프로젝트 구조
-
-```
-src/main/java/com/postalroute/backend/
-├── route/      # 동선 최적화 핵심 로직 (시간 기준 묶기, 용량 분할, 거리 계산)
-├── vehicle/    # 차량 톤수별 적재 기준표
-├── history/    # 이력 저장/조회/삭제
-├── company/    # 업체(주소록) 관리
-└── user/       # 로그인/회원가입
-
-src/main/resources/static/   # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
-```
