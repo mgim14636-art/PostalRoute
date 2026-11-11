@@ -177,17 +177,45 @@ erDiagram
 ### 3. 프로젝트 구조
 
 ```
-src/main/java/com/postalroute/backend/
-├── route/      # 동선 최적화 핵심 로직 (시간 기준 묶기, 용량 분할, 거리 계산)
-├── vehicle/    # 차량 톤수별 적재 기준표
-├── history/    # 이력 저장/조회/삭제
-├── company/    # 업체(주소록) 관리
-└── user/       # 로그인/회원가입
-
-src/main/resources/static/   # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
+postalroute
+├── src/main/java/com/postalroute/backend
+│   ├── BackendApplication.java   # 스프링 부트 시작점
+│   ├── config/     # 공통 설정 (WebConfig 등)
+│   ├── route/      # 동선 최적화 핵심 로직
+│   ├── vehicle/    # 차량 톤수별 적재 기준표
+│   ├── history/    # 이력 저장/조회/삭제
+│   ├── company/    # 업체(주소록) 관리
+│   └── user/       # 로그인/회원가입
+│
+└── src/main/resources
+    ├── static/     # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
+    └── application.properties.example
 ```
 
+**패키지별 역할**
+
+| 패키지 | 역할 |
+|---|---|
+| `config` | 공통 설정 (CORS 등 WebConfig) |
+| `route` | 동선 최적화 핵심 로직 — 시간 기준 클러스터링, 용량 분할, 좌표·거리 계산, 계산 결과 이력 자동 저장 |
+| `vehicle` | 차량 톤수별 평파렛/롤파렛 적재 기준표 |
+| `history` | 계산 이력 저장 · 조회 · 삭제 |
+| `company` | 업체(주소록) 등록 · 수정 · 삭제 · 검색 |
+| `user` | 회원가입 · 로그인 · 아이디/비밀번호 찾기 |
+
+**화면 구성 (`static/`)**
+
+| 화면 | 역할 |
+|---|---|
+| `login.html` / `signup.html` / `find-id.html` / `find-pw.html` / `reset-password.html` | 로그인 · 회원가입 · 계정 찾기 |
+| `main.html` | 메인 화면 |
+| `route-optimize.html` → `route-result.html` | 집하지 입력 → 동선 최적화 결과 |
+| `history.html` | 계산 이력 조회 |
+| `companies.html` | 업체(주소록) 관리 |
+
 ## 실행 방법
+
+아래는 **Windows** 환경 기준 실행 방법이다.
 
 1. MariaDB에 `postal_db` 데이터베이스를 만든다.
 2. `src/main/resources/application.properties.example` 파일을 복사해서 같은 폴더에 `application.properties`로 만들고, 본인의 DB 비밀번호와 카카오 API 키를 입력한다.
@@ -197,8 +225,9 @@ src/main/resources/static/   # 화면 (로그인, 동선 최적화, 이력 관�
    spring.datasource.password=본인_DB_비밀번호
    kakao.api.key=본인_카카오_API_키
    ```
-3. 아래 명령어로 실행한다.
+3. PowerShell을 열고, 프로젝트 루트 폴더(`postalroute`)로 이동한다.
+4. 아래 명령어로 실행한다.
    ```
-   ./gradlew bootRun
+   .\gradlew.bat bootRun
    ```
-4. 브라우저에서 `http://localhost:8080/login.html` 로 접속한다.
+5. 브라우저에서 `http://localhost:8080/login.html` 로 접속한다.
