@@ -70,7 +70,25 @@
 
 ## ⅱ. 구조 및 설계
 
-### 1. API 설계
+### 1. 프로젝트 구조
+
+```
+postalroute
+├── src/main/java/com/postalroute/backend
+│   ├── BackendApplication.java   # 스프링 부트 시작점
+│   ├── config/     # 공통 설정 (WebConfig 등)
+│   ├── route/      # 동선 최적화 핵심 로직
+│   ├── vehicle/    # 차량 톤수별 적재 기준표
+│   ├── history/    # 이력 저장/조회/삭제
+│   ├── company/    # 업체(주소록) 관리
+│   └── user/       # 로그인/회원가입
+│
+└── src/main/resources
+    ├── static/     # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
+    └── application.properties.example
+```
+
+### 2. API 설계
 
 **회원 (`UserController`)**
 
@@ -108,7 +126,7 @@
 | GET | `/api/route/history/{id}` | 이력 상세 조회 (본인 이력만) |
 | DELETE | `/api/route/history/{id}` | 이력 삭제 (본인 이력만) |
 
-### 2. DB 설계
+### 3. DB 설계
 
 ```mermaid
 erDiagram
@@ -173,45 +191,6 @@ erDiagram
 | vehicle_count | INT | NOT NULL | 배정된 차량 대수 |
 | total_distance_km | DOUBLE | NOT NULL | 전체 이동 거리 합 |
 | result_json | LONGTEXT | | 계산 결과(차량별 전체 경로) 저장, 상세보기·재계산·엑셀 다운로드에 재사용 |
-
-### 3. 프로젝트 구조
-
-```
-postalroute
-├── src/main/java/com/postalroute/backend
-│   ├── BackendApplication.java   # 스프링 부트 시작점
-│   ├── config/     # 공통 설정 (WebConfig 등)
-│   ├── route/      # 동선 최적화 핵심 로직
-│   ├── vehicle/    # 차량 톤수별 적재 기준표
-│   ├── history/    # 이력 저장/조회/삭제
-│   ├── company/    # 업체(주소록) 관리
-│   └── user/       # 로그인/회원가입
-│
-└── src/main/resources
-    ├── static/     # 화면 (로그인, 동선 최적화, 이력 관리, 업체 관리 등)
-    └── application.properties.example
-```
-
-**패키지별 역할**
-
-| 패키지 | 역할 |
-|---|---|
-| `config` | 공통 설정 (CORS 등 WebConfig) |
-| `route` | 동선 최적화 핵심 로직 — 시간 기준 클러스터링, 용량 분할, 좌표·거리 계산, 계산 결과 이력 자동 저장 |
-| `vehicle` | 차량 톤수별 평파렛/롤파렛 적재 기준표 |
-| `history` | 계산 이력 저장 · 조회 · 삭제 |
-| `company` | 업체(주소록) 등록 · 수정 · 삭제 · 검색 |
-| `user` | 회원가입 · 로그인 · 아이디/비밀번호 찾기 |
-
-**화면 구성 (`static/`)**
-
-| 화면 | 역할 |
-|---|---|
-| `login.html` / `signup.html` / `find-id.html` / `find-pw.html` / `reset-password.html` | 로그인 · 회원가입 · 계정 찾기 |
-| `main.html` | 메인 화면 |
-| `route-optimize.html` → `route-result.html` | 집하지 입력 → 동선 최적화 결과 |
-| `history.html` | 계산 이력 조회 |
-| `companies.html` | 업체(주소록) 관리 |
 
 ## 실행 방법
 
