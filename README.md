@@ -32,22 +32,41 @@
 
 ### 3. 개발 환경
 
+**[IDE]**
+
+![IntelliJ IDEA](https://img.shields.io/badge/IntelliJ%20IDEA-000000?style=for-the-badge&logo=intellijidea&logoColor=white)
+
 **[Backend]**
-- IntelliJ IDEA
-- Java 17
-- Spring Boot 4.1.1
-- Gradle
+
+![Java](https://img.shields.io/badge/Java%2017-007396?style=for-the-badge&logo=openjdk&logoColor=white)
+![Spring Boot](https://img.shields.io/badge/Spring%20Boot%204.1.1-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)
+![Gradle](https://img.shields.io/badge/Gradle-02303A?style=for-the-badge&logo=gradle&logoColor=white)
 
 **[Database]**
-- MariaDB (로컬 개발) / Naver Cloud DB for MySQL (운영 배포)
+
+![MariaDB](https://img.shields.io/badge/MariaDB-003545?style=for-the-badge&logo=mariadb&logoColor=white)
+![Naver Cloud DB](https://img.shields.io/badge/Naver%20Cloud%20DB%20for%20MySQL-03C75A?style=for-the-badge&logo=naver&logoColor=white)
+
+**[API]**
+
+![Kakao Map](https://img.shields.io/badge/Kakao%20Map%20API-FFCD00?style=for-the-badge&logo=kakao&logoColor=000000)
+![Kakao Mobility](https://img.shields.io/badge/Kakao%20Mobility%20API-FFCD00?style=for-the-badge&logo=kakao&logoColor=000000)
+
+**[Library]**
+
+![SheetJS](https://img.shields.io/badge/SheetJS-00A86B?style=for-the-badge)
+![ExcelJS](https://img.shields.io/badge/ExcelJS-217346?style=for-the-badge&logo=microsoftexcel&logoColor=white)
 
 **[Frontend]**
-- 순수 HTML / CSS / JavaScript (별도 프레임워크 없음)
-- 카카오 지도 API (주소 → 좌표 변환), 카카오 모빌리티 API (실제 도로 거리/시간 계산)
-- SheetJS (엑셀 가져오기), ExcelJS (엑셀 내보내기, 서식 포함)
+
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=for-the-badge&logo=javascript&logoColor=000000)
 
 **[Infra]**
-- Naver Cloud Platform (Rocky Linux 9.8), Docker 배포 예정
+
+![Naver Cloud Platform](https://img.shields.io/badge/Naver%20Cloud%20Platform-03C75A?style=for-the-badge&logo=naver&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
 
 ## ⅱ. 구조 및 설계
 
@@ -123,10 +142,39 @@ erDiagram
     }
 ```
 
-- `USER`: 회원 한 명을 나타낸다. `username`/`password`는 로그인에, `name`/`phoneNumber`는 아이디·비밀번호 찾기 본인 확인에 쓴다.
-- `COMPANY_ALIAS`: 자주 쓰는 업체의 이름-주소 짝이다. `userId`로 "내가 등록한 업체만" 걸러서 보여준다.
-- `ROUTE_HISTORY`: 동선 최적화를 계산할 때마다 자동으로 한 줄씩 쌓이는 이력이다. `resultJson`에 그때 계산된 차량별 전체 경로를 그대로 저장해서, 상세보기/재계산/엑셀 다운로드에 다시 쓴다.
-- `userId`는 JPA 연관관계(`@ManyToOne`) 없이 단순 컬럼으로만 연결되어 있다 (조회 시 애플리케이션 코드에서 직접 필터링).
+#### User
+
+| 컬럼명 | 데이터 타입 | 조건 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, NOT NULL, AI | 고유 증가값 |
+| name | VARCHAR | NOT NULL | 이름 |
+| username | VARCHAR | NOT NULL | 로그인 아이디 |
+| password | VARCHAR | NOT NULL | 비밀번호 (암호화 저장) |
+| phone_number | VARCHAR | NOT NULL | 전화번호 (아이디·비밀번호 찾기 본인 확인용) |
+
+#### Company_Alias
+
+| 컬럼명 | 데이터 타입 | 조건 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, NOT NULL, AI | 고유 증가값 |
+| user_id | BIGINT | NOT NULL | 등록한 회원 id (논리적 FK, 관계 미설정) |
+| name | VARCHAR | NOT NULL | 업체명 |
+| address | VARCHAR | NOT NULL | 주소 |
+| detail_address | VARCHAR | | 상세주소 (없으면 NULL) |
+
+#### Route_History
+
+| 컬럼명 | 데이터 타입 | 조건 | 설명 |
+|---|---|---|---|
+| id | BIGINT | PK, NOT NULL, AI | 고유 증가값 |
+| user_id | BIGINT | NOT NULL | 계산한 회원 id (논리적 FK, 관계 미설정) |
+| created_at | DATETIME | NOT NULL | 계산한 시각 |
+| destination_count | INT | NOT NULL | 입력한 집하지 개수 |
+| vehicle_count | INT | NOT NULL | 배정된 차량 대수 |
+| total_distance_km | DOUBLE | NOT NULL | 전체 이동 거리 합 |
+| result_json | LONGTEXT | | 계산 결과(차량별 전체 경로) 저장, 상세보기·재계산·엑셀 다운로드에 재사용 |
+
+`user_id`는 JPA 연관관계(`@ManyToOne`) 없이 단순 컬럼으로만 연결되어 있다 (조회 시 애플리케이션 코드에서 직접 필터링).
 
 ## 실행 방법
 
