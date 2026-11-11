@@ -148,13 +148,93 @@ public class DestinationClusterer {
         return splitOverCapacityRoutes(vehicleRoutes);
     }
 
-    // 차량 경로들을 돌면서, 용량을 넘는 경로가 있으면 여러 대로 쪼갬
+    // 차량 경로들을 돌면서, 용량을 넘는 분량은 일단 "오갈 데 없는 목적지" 명단으로 빼놓고,
+    // 그 목적지들을 새 차를 만들기 전에 먼저 "기존 차 중 용량/시간이 맞는 곳"에 끼워넣어 본다.
+    // (예전엔 넘치면 무조건 새 차를 만들었는데, 그러면 목적지 하나 때문에 차 한 대를 통째로
+    //  더 써야 하는 낭비가 생겨서, 가까운 기존 차한테 넘겨줄 수 있으면 그쪽으로 먼저 보내도록 바꿈)
     private List<List<Destination>> splitOverCapacityRoutes(List<List<Destination>> routes) {
-        List<List<Destination>> result = new ArrayList<>();
+        List<List<Destination>> keptRoutes = new ArrayList<>();
+        List<Destination> overflowDestinations = new ArrayList<>();
+
+        // 1. 각 경로를 앞에서부터 채워보고, 원래 차로 감당되는 부분만 남기고 나머지는 전부
+        //    "오갈 데 없는 목적지" 명단에 담아둔다 (여러 개가 같이 넘쳤어도 하나씩 따로 담음 -
+        //    그래야 각자한테 제일 잘 맞는 자리를 따로따로 찾아줄 수 있음).
         for (List<Destination> route : routes) {
-            result.addAll(splitSingleRouteByCapacity(route));
+            List<List<Destination>> split = splitSingleRouteByCapacity(route);
+            keptRoutes.add(split.get(0));
+            for (int i = 1; i < split.size(); i++) {
+                overflowDestinations.addAll(split.get(i));
+            }
         }
-        return result;
+
+        // 2. 오갈 데 없는 목적지들을, 기존 차 중 "용량도 되고 시간도 맞는" 곳 중에서
+        //    거리가 제일 적게 늘어나는 자리에 끼워넣는다. 그런 자리가 끝까지 하나도 없을 때만
+        //    어쩔 수 없이 이 목적지 하나만 싣는 새 차를 만든다.
+        for (Destination d : overflowDestinations) {
+            InsertionSpot spot = findBestReassignmentSpot(keptRoutes, d);
+            if (spot != null) {
+                keptRoutes.get(spot.vehicleIndex).add(spot.position, d);
+            } else {
+                List<Destination> newRoute = new ArrayList<>();
+                newRoute.add(d);
+                keptRoutes.add(newRoute);
+            }
+        }
+
+        return keptRoutes;
+    }
+
+    // routes 중에서 d를 받아줄 수 있는 "제일 저렴한(거리가 적게 늘어나는)" 자리를 찾는다.
+    // 용량이 안 되는 차는 아예 후보에서 제외하고, 시간 제약도 같이 확인한다.
+    private InsertionSpot findBestReassignmentSpot(List<List<Destination>> routes, Destination d) {
+        double bestExtraCost = Double.MAX_VALUE;
+        InsertionSpot best = null;
+
+        for (int v = 0; v < routes.size(); v++) {
+            List<Destination> route = routes.get(v);
+            int[] totals = totalPallets(route);
+            if (!canAnyVehicleLoad(totals[0] + d.getFlatPalletCount(), totals[1] + d.getRollPalletCount())) {
+                continue; // 이 차는 d까지 더하면 어떤 톤수로도 못 실음 -> 후보에서 제외
+            }
+            for (int pos = 0; pos <= route.size(); pos++) {
+                if (!canReassignAt(route, pos, d)) continue;
+                double extraCost = insertionCost(route, pos, d);
+                if (extraCost < bestExtraCost) {
+                    bestExtraCost = extraCost;
+                    best = new InsertionSpot(v, pos);
+                }
+            }
+        }
+        return best;
+    }
+
+    // route에 실린 평파렛/롤파렛 총합을 구한다 ([0]=평파렛 합, [1]=롤파렛 합)
+    private int[] totalPallets(List<Destination> route) {
+        int flat = 0, roll = 0;
+        for (Destination d : route) {
+            flat += d.getFlatPalletCount();
+            roll += d.getRollPalletCount();
+        }
+        return new int[]{flat, roll};
+    }
+
+    // route의 pos 자리에 d를 끼워넣어도 시간상 말이 되는지 확인한다.
+    // d 자신에게 희망시간이 있으면, 끼워넣는 자리의 앞/뒤 순서가 그 시간과 어긋나지 않는지부터 먼저 보고
+    // (예: 9시에 가야 할 곳을 10시 목적지 뒤에 끼워넣으면 안 되니까),
+    // 그다음 기존 isTimeFeasible로 "실제로 그 틈에 들렀다 갈 시간이 되는지"까지 확인한다.
+    private boolean canReassignAt(List<Destination> route, int pos, Destination d) {
+        Integer dMinutes = parseMinutes(d.getRequestedTime());
+        if (dMinutes != null) {
+            if (pos > 0) {
+                Integer beforeMinutes = parseMinutes(route.get(pos - 1).getRequestedTime());
+                if (beforeMinutes != null && dMinutes < beforeMinutes) return false;
+            }
+            if (pos < route.size()) {
+                Integer afterMinutes = parseMinutes(route.get(pos).getRequestedTime());
+                if (afterMinutes != null && dMinutes > afterMinutes) return false;
+            }
+        }
+        return isTimeFeasible(route, pos, d);
     }
 
     // 방문 순서를 유지한 채로, 앞에서부터 차곡차곡 실어보다가
