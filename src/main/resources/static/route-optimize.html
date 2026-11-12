@@ -416,7 +416,13 @@
 
                     companyResults.innerHTML = '';
                     if (companies.length === 0) {
-                        companyResults.innerHTML = '<div class="dest-company-result-item">등록된 업체가 없어요</div>';
+                        const emptyItem = document.createElement('div');
+                        emptyItem.className = 'dest-company-result-item';
+                        emptyItem.textContent = '등록된 업체가 없어요';
+                        emptyItem.addEventListener('click', function() {
+                            companyResults.classList.remove('show');
+                        });
+                        companyResults.appendChild(emptyItem);
                     } else {
                         companies.forEach(function(company) {
                             const item = document.createElement('div');
