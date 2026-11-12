@@ -671,6 +671,13 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    // 업체명(A열)을 전부 비워두면 시트 범위가 B열부터로 저장되면서
+                    // 아래 줄에서 모든 값이 한 칸씩 밀려 읽히는 문제가 있어서, 항상 A열부터 읽도록 강제함
+                    if (sheet['!ref']) {
+                        const range = XLSX.utils.decode_range(sheet['!ref']);
+                        range.s.c = 0;
+                        sheet['!ref'] = XLSX.utils.encode_range(range);
+                    }
                     rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
                 } catch (err) {
                     showError('엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요.');
