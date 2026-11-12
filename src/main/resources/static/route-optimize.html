@@ -229,6 +229,7 @@
             </div>
             <div class="modal-actions">
                 <button type="button" id="pasteImportCancelBtn" class="btn-ghost">취소</button>
+                <button type="button" id="pasteImportConfirmBtn" class="btn-primary">확인</button>
             </div>
         </div>
     </div>
@@ -558,11 +559,14 @@
         const pasteImportModal = document.getElementById('pasteImportModal');
         const excelFileInput = document.getElementById('excelFileInput');
         const excelFileName = document.getElementById('excelFileName');
+        // 파일을 고른 시점엔 읽기만 해두고, "확인"을 눌러야 실제로 집하 동선에 반영함
+        let pendingImportRows = null;
 
         function openPasteImportModal() {
             pasteImportModal.classList.add('show');
             excelFileInput.value = '';
             excelFileName.textContent = '선택된 파일 없음';
+            pendingImportRows = null;
         }
 
         function closePasteImportModal() {
@@ -713,15 +717,15 @@
             }
         }
 
-        // 엑셀 파일(.xlsx/.xls/.csv)을 선택하면 바로 읽어서 추가함
+        // 엑셀 파일(.xlsx/.xls/.csv)을 선택하면 일단 읽기만 해두고, "확인"을 눌러야 집하 동선에 반영됨
         excelFileInput.addEventListener('change', function(event) {
             const file = event.target.files[0];
             if (!file) return;
             excelFileName.textContent = file.name;
+            pendingImportRows = null;
 
             const reader = new FileReader();
-            reader.onload = async function(e) {
-                let rows;
+            reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
@@ -733,17 +737,25 @@
                         range.s.c = 0;
                         sheet['!ref'] = XLSX.utils.encode_range(range);
                     }
-                    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                    pendingImportRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
                 } catch (err) {
                     showError('엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요.');
-                    return;
                 }
-                await importDestinationRows(rows);
             };
             reader.onerror = function() {
                 showError('엑셀 파일을 읽지 못했어요.');
             };
             reader.readAsArrayBuffer(file);
+        });
+
+        // "확인"을 눌러야 미리 읽어둔 엑셀 내용이 실제로 집하 동선에 반영됨
+        document.getElementById('pasteImportConfirmBtn').addEventListener('click', async function() {
+            if (!pendingImportRows) {
+                showError('엑셀 파일을 먼저 선택해주세요.');
+                return;
+            }
+            await importDestinationRows(pendingImportRows);
+            pendingImportRows = null;
         });
 
         // 집하 동선 목록 전체를 지우고 한 줄만 남겨서 처음 상태로 되돌리는 버튼

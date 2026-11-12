@@ -175,6 +175,7 @@
             </div>
             <div class="modal-actions">
                 <button type="button" id="companyImportCancelBtn" class="btn-ghost">취소</button>
+                <button type="button" id="companyImportConfirmBtn" class="btn-primary">확인</button>
             </div>
         </div>
     </div>
@@ -314,14 +315,19 @@
         const companyExcelFileInput = document.getElementById('companyExcelFileInput');
         const companyExcelFileName = document.getElementById('companyExcelFileName');
 
+        // 파일을 고른 시점엔 읽기만 해두고, "확인"을 눌러야 실제로 등록함
+        let pendingCompanyImportRows = null;
+
         document.getElementById('companyImportOpenBtn').addEventListener('click', function() {
             companyImportModal.classList.add('show');
             companyExcelFileInput.value = '';
             companyExcelFileName.textContent = '선택된 파일 없음';
+            pendingCompanyImportRows = null;
         });
 
         document.getElementById('companyImportCancelBtn').addEventListener('click', function() {
             companyImportModal.classList.remove('show');
+            pendingCompanyImportRows = null;
         });
 
         companyImportModal.addEventListener('click', function(event) {
@@ -334,25 +340,33 @@
             const file = event.target.files[0];
             if (!file) return;
             companyExcelFileName.textContent = file.name;
+            pendingCompanyImportRows = null;
 
             const reader = new FileReader();
-            reader.onload = async function(e) {
-                let rows;
+            reader.onload = function(e) {
                 try {
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                    rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+                    pendingCompanyImportRows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
                 } catch (err) {
                     showNotice('엑셀 파일을 읽지 못했어요. 파일 형식을 확인해주세요.');
-                    return;
                 }
-                await importCompaniesFromRows(rows);
             };
             reader.onerror = function() {
                 showNotice('엑셀 파일을 읽지 못했어요.');
             };
             reader.readAsArrayBuffer(file);
+        });
+
+        // "확인"을 눌러야 미리 읽어둔 엑셀 내용이 실제로 업체로 등록됨
+        document.getElementById('companyImportConfirmBtn').addEventListener('click', async function() {
+            if (!pendingCompanyImportRows) {
+                showNotice('엑셀 파일을 먼저 선택해주세요.');
+                return;
+            }
+            await importCompaniesFromRows(pendingCompanyImportRows);
+            pendingCompanyImportRows = null;
         });
 
         // rows: [[업체명, 주소, 상세주소], ...] - 한 줄씩 순서대로 등록 요청을 보냄
