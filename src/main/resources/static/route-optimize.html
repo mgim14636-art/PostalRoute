@@ -609,24 +609,14 @@
             }
         }
 
-        // 주소 맨 앞 시/도 이름만 떼고 나머지(시/군/구+도로명+번지)로 비교하기 위한 전처리
-        // (다음 주소 데이터가 같은 곳을 "전라남도"로 줄 때도 있고 "전남광주통합특별시"처럼 다르게 줄 때도 있어서,
-        //  맨 앞 한 단어는 무시하고 비교해야 같은 주소로 인식됨)
-        function addressTail(address) {
-            const parts = (address || '').trim().split(/\s+/);
-            return parts.slice(1).join(' ');
-        }
-
-        // 등록된 업체 중에 주소가 (시/도 이름을 빼고) 같은 업체를 찾아 돌려줌 (없으면 null)
+        // 등록된 업체 중에 주소가 정확히 같은 업체를 찾아 돌려줌 (없으면 null)
         // - 주소 검색 팝업으로 직접 주소를 골랐을 때, 그 주소가 등록된 업체 주소와 같으면 업체명을 자동으로 연결해주는 데 씀
         async function findCompanyByExactAddress(address) {
             try {
-                const tail = addressTail(address);
-                if (tail === '') return null;
                 const response = await fetch('/api/companies');
                 if (!response.ok) return null;
                 const companies = await response.json();
-                return companies.find(function(c) { return addressTail(c.address) === tail; }) || null;
+                return companies.find(function(c) { return c.address === address; }) || null;
             } catch (e) {
                 return null;
             }
