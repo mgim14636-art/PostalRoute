@@ -270,13 +270,24 @@
        }
        addressSearchOpen = true;
        new daum.Postcode({
-       oncomplete: function(data) {
+       oncomplete: async function(data) {
        inputElement.value = data.address;
        const row = inputElement.closest('.destination-row');
        if (row) {
            row.classList.remove('dest-row-error');
            // 주소를 직접 다시 검색해서 바꿨으면, 더 이상 "등록된 업체의 그 주소"가 아닐 수 있으니 표시를 지움
            delete row.dataset.confirmedCompanyName;
+
+           // 고른 주소가 등록된 업체 주소와 똑같으면, 업체명 칸이 비어있을 때만 자동으로 채워 연결해줌
+           // (이미 업체명을 직접 적어둔 경우는 덮어쓰지 않음)
+           const companySearch = row.querySelector('.dest-company-search');
+           if (companySearch && companySearch.value.trim() === '') {
+               const company = await findCompanyByExactAddress(data.address);
+               if (company) {
+                   companySearch.value = company.name;
+                   row.dataset.confirmedCompanyName = company.name;
+               }
+           }
        }
             },
        onclose: function() {
@@ -593,6 +604,19 @@
                 if (!response.ok) return null;
                 const companies = await response.json();
                 return companies.find(function(c) { return c.name === name; }) || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        // 등록된 업체 중에 주소가 정확히 같은 업체를 찾아 돌려줌 (없으면 null)
+        // - 주소 검색 팝업으로 직접 주소를 골랐을 때, 그 주소가 등록된 업체 주소와 같으면 업체명을 자동으로 연결해주는 데 씀
+        async function findCompanyByExactAddress(address) {
+            try {
+                const response = await fetch('/api/companies');
+                if (!response.ok) return null;
+                const companies = await response.json();
+                return companies.find(function(c) { return c.address === address; }) || null;
             } catch (e) {
                 return null;
             }
