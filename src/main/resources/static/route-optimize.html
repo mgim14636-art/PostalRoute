@@ -622,20 +622,22 @@
                 return;
             }
 
-            // 주소가 비어있고 업체명만 있는 줄은, 등록된 업체 목록에서 이름이 같은 곳을 찾아 주소를 채워넣음
+            // 업체명이 적힌 줄은 등록된 업체 목록에서 이름이 같은 곳을 찾음
+            // (주소까지 같이 적혀있어도, 등록된 업체명과 일치하면 결과 화면에 "(업체명)" 표시가 붙도록 확인만 함)
             const notFoundCompanies = [];
             for (const candidate of candidates) {
-                if (candidate.address === '' && candidate.companyName !== '') {
-                    const company = await findCompanyByExactName(candidate.companyName);
-                    if (company) {
+                if (candidate.companyName === '') continue;
+                const company = await findCompanyByExactName(candidate.companyName);
+                if (company) {
+                    if (candidate.address === '') {
                         candidate.address = company.address;
                         if (candidate.detail === '') {
                             candidate.detail = company.detailAddress || '';
                         }
-                        candidate.isRegisteredCompany = true; // 결과 화면에 "(업체명)" 표시할지 여부
-                    } else {
-                        notFoundCompanies.push(candidate.companyName);
                     }
+                    candidate.isRegisteredCompany = true; // 결과 화면에 "(업체명)" 표시할지 여부
+                } else if (candidate.address === '') {
+                    notFoundCompanies.push(candidate.companyName);
                 }
             }
 
