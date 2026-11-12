@@ -481,6 +481,17 @@
                 row.querySelector('.dest-flat').value = initialData.flatPalletCount || '';
                 row.querySelector('.dest-roll').value = initialData.rollPalletCount || '';
                 timeText.value = initialData.requestedTime || '';
+
+                // 업체명 없이 주소만 복원된 줄(이력 재사용·동선 다시 입력하기 등)도,
+                // 그 주소가 등록된 업체 주소와 같으면 업체명을 뒤늦게라도 찾아서 연결해줌
+                if (!initialData.companyName && initialData.name) {
+                    findCompanyByExactAddress(initialData.name).then(function(company) {
+                        if (company && companySearch.value.trim() === '') {
+                            companySearch.value = company.name;
+                            row.dataset.confirmedCompanyName = company.name;
+                        }
+                    });
+                }
             }
 
             item.appendChild(row);
